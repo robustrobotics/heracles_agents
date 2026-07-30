@@ -5,10 +5,48 @@ omniplanner pipeline can ground the goal with runtime constraints applied.
 """
 
 import json
+import os
 import subprocess
 
 from heracles_agents.tool_interface import FunctionParameter, ToolDescription
 from heracles_agents.tool_registry import register_tool
+
+
+def _default_planner_topic() -> str:
+    """Topic the goal_manager listens on, derived from the running session.
+
+    goal_manager remaps ~/commanded_goal to /$ADT4_ROBOT_NAME/commanded_goal, so
+    the topic namespace is the namespace of the session the planner runs in --
+    on a base station that is the base station's name, not the robot's.
+    """
+    session_name = os.environ.get("ADT4_ROBOT_NAME")
+    if not session_name:
+        raise ValueError(
+            "planner_topic was not bound and ADT4_ROBOT_NAME is unset, so the "
+            "goal_manager topic cannot be derived. Set ADT4_ROBOT_NAME, or bind "
+            "planner_topic explicitly in the agent config."
+        )
+    return f"/{session_name}/commanded_goal"
+
+
+def _default_robot_name() -> str:
+    """Robot the goal is issued to, i.e. goal.robot_id.
+
+    This is not always the session name: on a base station the planner session is
+    named for the base station while the goal targets an actual robot, which is
+    what ADT4_EXECUTOR_ROBOT_NAME carries. In a single-session sim run the two
+    coincide, so fall back to ADT4_ROBOT_NAME.
+    """
+    robot = os.environ.get("ADT4_EXECUTOR_ROBOT_NAME") or os.environ.get(
+        "ADT4_ROBOT_NAME"
+    )
+    if not robot:
+        raise ValueError(
+            "robot_name was not bound and neither ADT4_EXECUTOR_ROBOT_NAME nor "
+            "ADT4_ROBOT_NAME is set, so the target robot is unknown. Set one of "
+            "them, or bind robot_name explicitly in the agent config."
+        )
+    return robot
 
 
 def _constraints_from_json(constraints_json: str) -> str:
@@ -42,10 +80,13 @@ def send_pddl_with_constraints(
     robot_name: str = None,
     planner_topic: str = None,
 ):
-    if robot_name is None or planner_topic is None:
-        raise ValueError(
-            "send_pddl_with_constraints called with robot_name or planner_topic missing"
-        )
+    # Both stay overridable from the agent config; unbound they follow the
+    # environment, so a config is not pinned to whichever robot it was written
+    # against.
+    if robot_name is None:
+        robot_name = _default_robot_name()
+    if planner_topic is None:
+        planner_topic = _default_planner_topic()
 
     constraints_yaml = _constraints_from_json(constraints_json)
     msg_yaml = (

@@ -16,9 +16,10 @@ agent_info:
         dsgdb_conf:
           dsg_interface_type: heracles
           uri: neo4j://$ADT4_HERACLES_IP:7683
+    # robot_name and planner_topic are intentionally left unbound: bound_args are
+    # not env-expanded, so pinning them here ties this config to one robot. Left
+    # out, the tool derives them from ADT4_EXECUTOR_ROBOT_NAME / ADT4_ROBOT_NAME,
+    # matching whatever run-adt4 session is running. Bind them to override.
     - name: send_pddl_goal_with_constraints
-      bound_args:
-        robot_name: hilbert
-        planner_topic: /hilbert/commanded_goal
   tool_interface: openai
   max_iterations: 6
