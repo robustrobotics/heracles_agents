@@ -18,18 +18,6 @@ from heracles_agents.llm_interface import AgentContext
 
 logger = logging.getLogger(__name__)
 
-# Location of the backend DSG inside a saved map directory (see $ADT4_PRIOR_MAP).
-PRIOR_DSG_RELPATH = os.path.join("hydra", "backend", "dsg.json")
-
-
-def default_scene_graph_path():
-    """Path to the prior DSG implied by $ADT4_PRIOR_MAP, or None if it is unset."""
-    prior_map = os.getenv("ADT4_PRIOR_MAP")
-    if not prior_map:
-        return None
-
-    return os.path.join(os.path.expanduser(prior_map), PRIOR_DSG_RELPATH)
-
 
 def neo4j_credentials():
     """Neo4j credentials, preferring HERACLES_* over the launch system's ADT4_*."""
@@ -174,10 +162,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser("ChatDSG agent")
     parser.add_argument(
         "--scene-graph",
-        nargs="?",
-        const=None,
+        type=str,
         default=None,
-        help=f"DSG filepath to load (defaults to $ADT4_PRIOR_MAP/{PRIOR_DSG_RELPATH})",
+        help="DSG filepath to load into the database on startup",
     )
     parser.add_argument(
         "--no-dsg-load",
@@ -194,16 +181,12 @@ if __name__ == "__main__":
     if args.db_port is None:
         args.db_port = os.getenv("ADT4_HERACLES_PORT")
 
-    dsg_filepath = args.scene_graph or default_scene_graph_path()
     if args.no_dsg_load:
         logger.info("Skipping DSG load (--no-dsg-load).")
-    elif dsg_filepath is None:
-        logger.warning(
-            "No DSG to load: pass --scene-graph or set $ADT4_PRIOR_MAP to a saved "
-            "map directory."
-        )
+    elif not args.scene_graph:
+        logger.warning("No DSG to load: pass --scene-graph to load one on startup.")
     else:
-        load_prior_dsg(dsg_filepath, f"neo4j://{args.db_ip}:{args.db_port}")
+        load_prior_dsg(args.scene_graph, f"neo4j://{args.db_ip}:{args.db_port}")
 
     with open("agent_config.yaml", "r") as fo:
         yml = yaml.safe_load(fo)
