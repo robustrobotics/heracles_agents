@@ -15,7 +15,7 @@ agent_info:
       bound_args:
         dsgdb_conf:
           dsg_interface_type: heracles
-          uri: neo4j://$ADT4_HERACLES_IP:$ADT4_HERACLES_PORT
+          uri: $HERACLES_NEO4J_URI
     - name: send_multirobot_pddl_goal
       bound_args:
         planner_topic: /${ADT4_ROBOT_NAME}/omniplanner_node/multirobot_region_rearrange_objects_pddl/pddl_goal

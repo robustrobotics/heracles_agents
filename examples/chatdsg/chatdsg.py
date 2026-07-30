@@ -19,13 +19,6 @@ from heracles_agents.llm_interface import AgentContext
 logger = logging.getLogger(__name__)
 
 
-def neo4j_credentials():
-    """Neo4j credentials, preferring HERACLES_* over the launch system's ADT4_*."""
-    user = os.getenv("HERACLES_NEO4J_USERNAME") or os.getenv("ADT4_NEO4J_USERNAME")
-    password = os.getenv("HERACLES_NEO4J_PASSWORD") or os.getenv("ADT4_NEO4J_PASSWORD")
-    return user, password
-
-
 def load_prior_dsg(dsg_filepath, neo4j_uri):
     """Load a DSG from file into Neo4j using the labelspaces embedded in the graph.
 
@@ -34,15 +27,25 @@ def load_prior_dsg(dsg_filepath, neo4j_uri):
     if not os.path.isfile(dsg_filepath):
         logger.warning(
             f"No DSG at '{dsg_filepath}'; skipping load. "
-            "The database will only contain whatever the heracles publisher adds."
+            "The database will only contain whatever is already in it."
         )
         return False
 
-    neo4j_creds = neo4j_credentials()
+    if not neo4j_uri:
+        logger.warning(
+            'No Neo4j URI: pass --neo4j-uri or set "$HERACLES_NEO4J_URI"; '
+            "skipping DSG load."
+        )
+        return False
+
+    neo4j_creds = (
+        os.getenv("HERACLES_NEO4J_USERNAME"),
+        os.getenv("HERACLES_NEO4J_PASSWORD"),
+    )
     if not all(neo4j_creds):
         logger.warning(
-            "Neo4j credentials are not set (need HERACLES_NEO4J_USERNAME/PASSWORD or "
-            "ADT4_NEO4J_USERNAME/PASSWORD); skipping DSG load."
+            'Neo4j credentials are not set ("$HERACLES_NEO4J_USERNAME" and '
+            '"$HERACLES_NEO4J_PASSWORD"); skipping DSG load.'
         )
         return False
 
@@ -171,22 +174,20 @@ if __name__ == "__main__":
         action="store_true",
         help="Don't load a DSG on startup (loading clears the existing database)",
     )
-    parser.add_argument("--db_ip", type=str, help="Heracles database ip")
-    parser.add_argument("--db_port", type=int, help="Heracles database ip")
+    parser.add_argument(
+        "--neo4j-uri",
+        type=str,
+        default=os.getenv("HERACLES_NEO4J_URI"),
+        help='Neo4j URI (defaults to "$HERACLES_NEO4J_URI")',
+    )
     args = parser.parse_args()
-
-    if args.db_ip is None:
-        args.db_ip = os.getenv("ADT4_HERACLES_IP")
-
-    if args.db_port is None:
-        args.db_port = os.getenv("ADT4_HERACLES_PORT")
 
     if args.no_dsg_load:
         logger.info("Skipping DSG load (--no-dsg-load).")
     elif not args.scene_graph:
         logger.warning("No DSG to load: pass --scene-graph to load one on startup.")
     else:
-        load_prior_dsg(args.scene_graph, f"neo4j://{args.db_ip}:{args.db_port}")
+        load_prior_dsg(args.scene_graph, args.neo4j_uri)
 
     with open("agent_config.yaml", "r") as fo:
         yml = yaml.safe_load(fo)
