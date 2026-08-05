@@ -3,6 +3,7 @@ import argparse
 import logging
 import os
 import threading
+from urllib.parse import urlsplit, urlunsplit
 
 import spark_dsg
 import yaml
@@ -17,6 +18,25 @@ from heracles_agents.llm_agent import LlmAgent
 from heracles_agents.llm_interface import AgentContext
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_neo4j_uri(neo4j_uri, db_ip, db_port):
+    """Apply the --db_ip/--db_port overrides on top of the configured URI."""
+    if db_ip is None and db_port is None:
+        return neo4j_uri
+
+    parts = urlsplit(neo4j_uri or "neo4j://")
+    host = db_ip or parts.hostname or ""
+    port = db_port or parts.port
+    return urlunsplit(
+        (
+            parts.scheme or "neo4j",
+            f"{host}:{port}" if port else host,
+            parts.path,
+            parts.query,
+            parts.fragment,
+        )
+    )
 
 
 def load_prior_dsg(dsg_filepath, neo4j_uri):
@@ -170,24 +190,25 @@ if __name__ == "__main__":
         help="DSG filepath to load into the database on startup",
     )
     parser.add_argument(
-        "--no-dsg-load",
-        action="store_true",
-        help="Don't load a DSG on startup (loading clears the existing database)",
-    )
-    parser.add_argument(
         "--neo4j-uri",
         type=str,
         default=os.getenv("HERACLES_NEO4J_URI"),
         help='Neo4j URI (defaults to "$HERACLES_NEO4J_URI")',
     )
+    parser.add_argument(
+        "--db_ip", type=str, help="Heracles database ip (overrides the URI host)"
+    )
+    parser.add_argument(
+        "--db_port", type=int, help="Heracles database port (overrides the URI port)"
+    )
     args = parser.parse_args()
 
-    if args.no_dsg_load:
-        logger.info("Skipping DSG load (--no-dsg-load).")
-    elif not args.scene_graph:
-        logger.warning("No DSG to load: pass --scene-graph to load one on startup.")
-    else:
-        load_prior_dsg(args.scene_graph, args.neo4j_uri)
+    # Passing a scene graph is what asks for the database to be loaded.
+    if args.scene_graph:
+        load_prior_dsg(
+            args.scene_graph,
+            resolve_neo4j_uri(args.neo4j_uri, args.db_ip, args.db_port),
+        )
 
     with open("agent_config.yaml", "r") as fo:
         yml = yaml.safe_load(fo)
