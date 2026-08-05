@@ -3,11 +3,12 @@ import argparse
 import logging
 import os
 import threading
+from urllib.parse import urlsplit, urlunsplit
 
 import spark_dsg
 import yaml
 from heracles.dsg_utils import summarize_dsg
-from heracles.utils import load_dsg_to_db
+from heracles.utils import extract_labelspaces_from_dsg, load_dsg_to_db
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import VerticalScroll
@@ -17,6 +18,81 @@ from heracles_agents.llm_agent import LlmAgent
 from heracles_agents.llm_interface import AgentContext
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_neo4j_uri(neo4j_uri, db_ip, db_port):
+    """Apply the --db_ip/--db_port overrides on top of the configured URI."""
+    if db_ip is None and db_port is None:
+        return neo4j_uri
+
+    parts = urlsplit(neo4j_uri or "neo4j://")
+    host = db_ip or parts.hostname or ""
+    port = db_port or parts.port
+    return urlunsplit(
+        (
+            parts.scheme or "neo4j",
+            f"{host}:{port}" if port else host,
+            parts.path,
+            parts.query,
+            parts.fragment,
+        )
+    )
+
+
+def load_prior_dsg(dsg_filepath, neo4j_uri):
+    """Load a DSG from file into Neo4j using the labelspaces embedded in the graph.
+
+    Returns True if the graph was loaded, False if it was skipped.
+    """
+    if not os.path.isfile(dsg_filepath):
+        logger.warning(
+            f"No DSG at '{dsg_filepath}'; skipping load. "
+            "The database will only contain whatever is already in it."
+        )
+        return False
+
+    if not neo4j_uri:
+        logger.warning(
+            'No Neo4j URI: pass --neo4j-uri or set "$HERACLES_NEO4J_URI"; '
+            "skipping DSG load."
+        )
+        return False
+
+    neo4j_creds = (
+        os.getenv("HERACLES_NEO4J_USERNAME"),
+        os.getenv("HERACLES_NEO4J_PASSWORD"),
+    )
+    if not all(neo4j_creds):
+        logger.warning(
+            'Neo4j credentials are not set ("$HERACLES_NEO4J_USERNAME" and '
+            '"$HERACLES_NEO4J_PASSWORD"); skipping DSG load.'
+        )
+        return False
+
+    logger.info(f"Loading DSG into database from filepath: {dsg_filepath}")
+    scene_graph = spark_dsg.DynamicSceneGraph.load(dsg_filepath)
+    summarize_dsg(scene_graph)
+
+    # load_dsg_to_db reads the labelspaces out of the graph metadata, so a graph
+    # saved without them will come back with unlabeled objects and rooms.
+    object_labelspace, room_labelspace = extract_labelspaces_from_dsg(scene_graph)
+    missing = [
+        name
+        for name, labelspace in (
+            ("object", object_labelspace),
+            ("room", room_labelspace),
+        )
+        if not labelspace
+    ]
+    if missing:
+        logger.warning(
+            f"DSG '{dsg_filepath}' has no embedded {' or '.join(missing)} labelspace; "
+            "those nodes will be loaded without semantic labels."
+        )
+
+    load_dsg_to_db(neo4j_uri, neo4j_creds, scene_graph)
+    logger.info("DSG loaded!")
+    return True
 
 
 def new_user_message(text):
@@ -104,56 +180,35 @@ class InputDisplayApp(App):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
     parser = argparse.ArgumentParser("ChatDSG agent")
     parser.add_argument(
         "--scene-graph",
-        nargs="?",
-        const=None,
+        type=str,
         default=None,
-        help="DSG Filepath to load",
+        help="DSG filepath to load into the database on startup",
     )
     parser.add_argument(
-        "--object-labelspace",
+        "--neo4j-uri",
         type=str,
-        help="Path to object labelspace",
-        default="ade20k_mit_label_space.yaml",
+        default=os.getenv("HERACLES_NEO4J_URI"),
+        help='Neo4j URI (defaults to "$HERACLES_NEO4J_URI")',
     )
     parser.add_argument(
-        "--room-labelspace",
-        type=str,
-        help="Path to room labelspace",
-        default="b45_label_space.yaml",
+        "--db_ip", type=str, help="Heracles database ip (overrides the URI host)"
     )
-    parser.add_argument("--db_ip", type=str, help="Heracles database ip")
-    parser.add_argument("--db_port", type=int, help="Heracles database ip")
+    parser.add_argument(
+        "--db_port", type=int, help="Heracles database port (overrides the URI port)"
+    )
     args = parser.parse_args()
 
-    if args.db_ip is None:
-        args.db_ip = os.getenv("ADT4_HERACLES_IP")
-
-    if args.db_port is None:
-        args.db_port = os.getenv("ADT4_HERACLES_PORT")
-
+    # Passing a scene graph is what asks for the database to be loaded.
     if args.scene_graph:
-        dsg_filepath = args.scene_graph
-        logger.info(f"Loading DSG into database from filepath: {dsg_filepath}")
-
-        scene_graph = spark_dsg.DynamicSceneGraph.load(dsg_filepath)
-        summarize_dsg(scene_graph)
-        neo4j_uri = f"neo4j://{args.db_ip}:{args.db_port}"
-        neo4j_creds = (
-            os.getenv("HERACLES_NEO4J_USERNAME"),
-            os.getenv("HERACLES_NEO4J_PASSWORD"),
+        load_prior_dsg(
+            args.scene_graph,
+            resolve_neo4j_uri(args.neo4j_uri, args.db_ip, args.db_port),
         )
-
-        load_dsg_to_db(
-            args.object_labelspace,
-            args.room_labelspace,
-            neo4j_uri,
-            neo4j_creds,
-            scene_graph,
-        )
-        logger.info("DSG loaded!")
 
     with open("agent_config.yaml", "r") as fo:
         yml = yaml.safe_load(fo)
