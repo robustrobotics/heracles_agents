@@ -1,20 +1,25 @@
 domain_description: |
   <PDDL Domain>
       The PDDL domain consists of the following predicates. These predicates get parameterized by symbols from a 3D scene graph.
-      IMPORTANT: All IDs in PDDL goals and constraints must be LOWERCASE. Places use prefix "p" (e.g., p23778), objects use prefix "o" (e.g., o188).
+      IMPORTANT: every ID you use must be a nodeSymbol you actually read from the database, written in LOWERCASE. Never invent an ID, and never change its prefix letter: if a query returns "T4826" you send "t4826", not "p4826". Look IDs up with run_cypher_query rather than guessing them from the examples below.
 
-      (visited-place ?p): Robot must visit place ?p at some point. Example: (visited-place p23778)
-      (visited-object ?o): Robot must visit object ?o at some point. Example: (visited-object o188)
-      (at-place ?p): Robot must end at place ?p.
-      (at-object ?o): Robot must end at object ?o.
-      (safe ?o): Robot must inspect object ?o. Example: (safe o188)
+      CRITICAL -- predicate arity differs. The "visited-" and "safe" predicates take ONLY the target. The "at-" and "holding" predicates take the ROBOT NAME FIRST, then the target. Using the wrong number of arguments makes the planner reject the problem outright, so copy these shapes exactly:
+
+      (visited-place ?t): Some robot visited place ?t at some point, where '?t' is a placeholder for a MeshPlace ID.
+      (visited-object ?o): Some robot visited object ?o at some point, where '?o' is a placeholder for an Object ID.
+      (safe ?o): Object ?o has been inspected.
+      (at-place ?r ?t): Robot ?r must END at place ?t, where '?r' is the robot name.
+      (at-object ?r ?o): Robot ?r must END at object ?o, where '?r' is the robot name.
+      (holding ?r ?o): Robot ?r must be holding object ?o, where '?r' is the robot name.
+
+      Use the same robot name you are sending the goal to. For a robot named hilbert: (at-object hilbert o15) is correct; (at-object o15) is REJECTED.
 
       When an instruction indicates an order, use "at-" predicates for the final destination and "visited-" predicates for intermediate stops.
 
       You can compose goals using:
-      and: multiple predicates must be true. Example: (and (visited-place p23778)(visited-object o188))
-      or: at least one must be true. Example: (or (visited-place p23778)(visited-place p34383))
-      not: negates a predicate. Example: (not (visited-object o188))
+      and: multiple predicates must be true. Example: (and (visited-place ?t)(visited-object ?o))
+      or: at least one must be true. Example: (or (visited-place ?t1)(visited-place ?t2))
+      not: negates a predicate. Example: (not (visited-object ?o))
 
       If the user is not specific about which object or place, use "or" to let the planner decide.
 
@@ -29,13 +34,13 @@ domain_description: |
 
       Constraint types:
       - forbidden-poi: forbids the robot from visiting (or transiting through) a specific place or object.
-        Example: [["forbidden-poi", "o188"]] forbids object o188.
-        Example: [["forbidden-poi", "p23778"]] forbids place p23778.
+        Example: [["forbidden-poi", "?o"]] forbids the object with ID ?o.
+        Example: [["forbidden-poi", "?t"]] forbids the place with ID ?t.
       - forbidden-edge: forbids the robot from traversing the edge between two points.
-        Example: [["forbidden-edge", "p1234", "p5678"]] blocks the corridor between p1234 and p5678.
+        Example: [["forbidden-edge", "?t1", "?t2"]] blocks the corridor between places ?t1 and ?t2.
         NOTE: forbidden-edge is unordered. You only need ONE direction, not both.
 
-      ALL constraint IDs must be LOWERCASE (e.g., "o188" not "O188", "p1234" not "P1234").
+      ALL constraint IDs must be LOWERCASE, and must be nodeSymbols that exist in the database. A constraint naming an ID that is not in the graph is silently ignored, so the robot will not avoid it -- always confirm the ID with run_cypher_query first.
 
       When the user says:
       - "avoid object X" or "don't go near place Y" -> use forbidden-poi
