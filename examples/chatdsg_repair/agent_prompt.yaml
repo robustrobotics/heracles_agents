@@ -22,7 +22,7 @@ system: |
   - MeshPlaces are labeled "MeshPlace" with properties: nodeSymbol, center, pos_x, pos_y, pos_z. They are traversability nodes and have NO semantic class, so never filter them by class.
   - This graph has no Room nodes, so do not query for Rooms or try to group nodes by room.
   - Use lowercase node symbols in PDDL goals (the database returns objects uppercase like O15 — convert to o15)
-scene_graph_description: ${HERACLES_EVALUATION_PATH}/examples/prompts/common/scene_graph_description.yaml
+scene_graph_description: ${HERACLES_EVALUATION_PATH}/examples/prompts/common/scene_graph_description_traversability.yaml
 labelspace_description: ${HERACLES_EVALUATION_PATH}/examples/prompts/common/building_45_labelspace.yaml
 interface_description: ${HERACLES_EVALUATION_PATH}/examples/prompts/common/cypher_interface_description.yaml
 domain_description: ${HERACLES_EVALUATION_PATH}/examples/prompts/common/pddl_domain_description_with_constraints.yaml

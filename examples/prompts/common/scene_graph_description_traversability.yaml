@@ -1,0 +1,8 @@
+scene_graph_description: |
+  <Scene Graph Description>
+  A 3D scene graph is a graph consisting of layers that each contain nodes. This graph has the MESH PLACES layer and the OBJECTS layer. 
+  2D Places Layer (MESH_PLACES): The 2D Places layer contains Places, which are traversability nodes: reachable locations the robot can navigate to. Each Place node has a unique ID (t<id>) and an x,y,z position (pos_x, pos_y, pos_z). Places have NO semantic class -- a Place is only a point in space, so never assume t<id> means a room, a landmark, or any named location. Places also carry clearance radii (min_radius, max_radius) describing how much free space surrounds them, and per-direction arrays (radii, states); you rarely need these.
+  Objects Layer (OBJECTS): The Objects layer contains Objects that exist in the world. Each Object has a unique ID (O<id>), a semantic class (class, e.g. chair, door, trash), and an x,y,z position (pos_x, pos_y, pos_z). Objects are the only nodes with semantic meaning, so identify locations by the Objects near them.
+  Relationships: (MeshPlace)-[:MESH_PLACE_CONNECTED]->(MeshPlace) means two Places are directly traversable between each other; this is how you reason about connectivity and reachability. (MeshPlace)-[:CONTAINS]->(Object) means the Object is located at that Place; this is the only parent relationship, so to find where an Object is, match (p:MeshPlace)-[:CONTAINS]->(o:Object).
+  To describe or choose a destination, prefer an Object id (O<id>) whose class matches what the user asked for. Use a Place id (t<id>) only when the user asks for a location with no Object at it, or when you need an intermediate waypoint.
+  </Scene Graph Description>
