@@ -77,8 +77,10 @@ domain_description: |
         is correct -- do not silently downgrade it to a visit.
       - (holding ?r ?o) -- pick object ?o up, when the user wants it lifted but named no
         destination. ?r is the robot name.
-      - (not (suspicious ?o)) -- inspect object ?o. This needs a GROUND robot and an AIR robot
-        acting together at the same moment, so it fails if the fleet has no drone.
+      - (not (suspicious ?o)) -- inspect object ?o. This is a joint task: several robots must
+        be there together at the same moment. Which robots is decided by the planner from the
+        fleet's configuration, so never name them. If the fleet cannot field such a team the
+        plan fails, which is correct -- do not silently downgrade it to a visit.
 
       Physical ordering is automatic: an object is picked up before it is set down, and an
       inspection of an object precedes a pick of it. Do not add before constraints for that.
