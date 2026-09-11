@@ -1,0 +1,58 @@
+in_context_examples:
+  # Simple visit place
+  - user: |
+      Instruction: Go to place 5041.
+    assistant: "I'll send the robot to place t5041.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(visited-place t5041)"
+  # Simple visit object
+  - user: |
+      Instruction: Go to object 188.
+    assistant: "I'll send the robot to object o188.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(visited-object o188)"
+  # Visit place and object together
+  - user: |
+      Instruction: Visit place 23778 and object 188.
+    assistant: "I'll send the robot to visit both place t23778 and object o188.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-place t23778)(visited-object o188))"
+  # Visit multiple places
+  - user: |
+      Instruction: Go to place 23778 and place 34383.
+    assistant: "I'll have the robot visit both places.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-place t23778)(visited-place t34383))"
+  # Goal with forbidden-poi constraint
+  - user: |
+      Instruction: Go to place 23778 but avoid object 187.
+    assistant: "I'll route the robot to place t23778 while avoiding object o187.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(visited-place t23778) and constraints_json=[[\"forbidden-poi\", \"o187\"]]"
+  # Goal with multiple constraints
+  - user: |
+      Instruction: Visit place 23778 but stay away from object 188 and object 130.
+    assistant: "I'll send the robot to t23778 while avoiding objects o188 and o130.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(visited-place t23778) and constraints_json=[[\"forbidden-poi\", \"o188\"], [\"forbidden-poi\", \"o130\"]]"
+  # Goal with forbidden-edge constraint (unordered — one direction is enough)
+  - user: |
+      Instruction: Go to place 23778 but the path between place 1234 and place 5678 is blocked.
+    assistant: "I'll route the robot to t23778 while avoiding the blocked edge.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(visited-place t23778) and constraints_json=[[\"forbidden-edge\", \"t1234\", \"t5678\"]]"
+  # Interrupt with new goal
+  - user: |
+      Instruction: Change the plan. Go to place 34383 instead.
+    assistant: "I'll interrupt the current plan and send the robot to t34383.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(visited-place t34383)"
+  # Natural language with scene graph query needed
+  - user: |
+      Instruction: Go to the nearest tree.
+    assistant: "I need to find tree objects in the scene graph first. Let me query for them.\n\nUsing run_cypher_query to find trees, then I'll send the goal with the correct object ID."
+  # Ordering: one thing before another (goals cannot express sequence)
+  - user: |
+      Instruction: Go to place 23778 first, then go to place 34383.
+    assistant: "Order matters here, so the sequence goes in the constraints.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-place t23778)(visited-place t34383)) and constraints_json=[[\"before\", \"t23778\", \"t34383\"]]"
+  # Relocation: move objects out of the way, then go in
+  - user: |
+      Instruction: Move object 4 and object 5 over to place 598, then go inspect place 299.
+    assistant: "Two relocations gate the visit, so both get a before entry.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (object-in-place o4 t598)(object-in-place o5 t598)(visited-place t299)) and constraints_json=[[\"before\", \"o4\", \"t299\"], [\"before\", \"o5\", \"t299\"]]"
+  # Clearing the way, destination not named by the user
+  - user: |
+      Instruction: Object 15 is blocking the corridor. Clear it out of the way and then check place 4214.
+    assistant: "I need a clear place to put o15 before I can write the goal. Let me query the graph for one away from the corridor.\n\nUsing run_cypher_query to find a suitable place, then send_pddl_goal_with_constraints with pddl_goal_string=(and (object-in-place o15 <that place>)(visited-place t4214)) and constraints_json=[[\"before\", \"o15\", \"t4214\"]]"
+  # Inspection needs a ground and an air robot together
+  - user: |
+      Instruction: Check whether object 7 is safe.
+    assistant: "That is an inspection, which pairs a ground robot with the drone.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(not (suspicious o7))"
+  # Chain of three steps
+  - user: |
+      Instruction: Clear object 16 to place 4316, then visit place 4812, and only after that go to place 4214.
+    assistant: "A three-step chain, so two before entries link them.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (object-in-place o16 t4316)(visited-place t4812)(visited-place t4214)) and constraints_json=[[\"before\", \"o16\", \"t4812\"], [\"before\", \"t4812\", \"t4214\"]]"
+
