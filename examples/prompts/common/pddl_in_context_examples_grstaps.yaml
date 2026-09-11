@@ -47,10 +47,10 @@ in_context_examples:
   - user: |
       Instruction: Object 15 is blocking the corridor. Clear it out of the way and then check place 4214.
     assistant: "I need a clear place to put o15 before I can write the goal. Let me query the graph for one away from the corridor.\n\nUsing run_cypher_query to find a suitable place, then send_pddl_goal_with_constraints with pddl_goal_string=(and (object-in-place o15 <that place>)(visited-place t4214)) and constraints_json=[[\"before\", \"o15\", \"t4214\"]]"
-  # Inspection needs a ground and an air robot together
+  # Inspection is a joint task; the planner picks the team
   - user: |
       Instruction: Check whether object 7 is safe.
-    assistant: "That is an inspection, which pairs a ground robot with the drone.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(not (suspicious o7))"
+    assistant: "That is an inspection, a joint task the planner assigns to a team of robots.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(not (suspicious o7))"
   # Chain of three steps
   - user: |
       Instruction: Clear object 16 to place 4316, then visit place 4812, and only after that go to place 4214.
