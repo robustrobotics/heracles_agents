@@ -15,6 +15,14 @@ in_context_examples:
   - user: |
       Instruction: Go to place 23778 and place 34383.
     assistant: "I'll have the robot visit both places.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-place t23778)(visited-place t34383))"
+  # Move an object somewhere: object-in-place, not holding
+  - user: |
+      Instruction: Move object 120 to place 11.
+    assistant: "I'll have the robot move object o120 and put it down at place t11.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(object-in-place o120 t11)"
+  # Pick up and keep: holding
+  - user: |
+      Instruction: Pick up object 120 and bring it to me at place 11.
+    assistant: "I'll have robot hilbert pick up o120 and end at place t11 still holding it.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (holding hilbert o120)(at-place hilbert t11))"
   # Goal with forbidden-poi constraint
   - user: |
       Instruction: Go to place 23778 but avoid object 187.

@@ -3,7 +3,7 @@ domain_description: |
       The PDDL domain consists of the following predicates. These predicates get parameterized by symbols from a 3D scene graph.
       IMPORTANT: every ID you use must be a nodeSymbol you actually read from the database, written in LOWERCASE. Never invent an ID, and never change its prefix letter: if a query returns "T4826" you send "t4826", not "p4826". Look IDs up with run_cypher_query rather than guessing them from the examples below.
 
-      CRITICAL -- predicate arity differs. The "visited-" and "safe" predicates take ONLY the target. The "at-" and "holding" predicates take the ROBOT NAME FIRST, then the target. Using the wrong number of arguments makes the planner reject the problem outright, so copy these shapes exactly:
+      CRITICAL -- predicate arity differs. The "visited-" and "safe" predicates take ONLY the target. The "at-" and "holding" predicates take the ROBOT NAME FIRST, then the target. "object-in-place" takes the OBJECT, then the place, and no robot. Using the wrong number of arguments makes the planner reject the problem outright, so copy these shapes exactly:
 
       (visited-place ?t): Some robot visited place ?t at some point, where '?t' is a placeholder for a MeshPlace ID.
       (visited-object ?o): Some robot visited object ?o at some point, where '?o' is a placeholder for an Object ID.
@@ -11,6 +11,10 @@ domain_description: |
       (at-place ?r ?t): Robot ?r must END at place ?t, where '?r' is the robot name.
       (at-object ?r ?o): Robot ?r must END at object ?o, where '?r' is the robot name.
       (holding ?r ?o): Robot ?r must be holding object ?o, where '?r' is the robot name.
+      The 'holding' predicate is for when the robot should pick an object up and keep it.
+
+      (object-in-place ?o ?t): Object ?o must end up inside MeshPlace ?t, where '?o' is an Object ID and '?t' is a MeshPlace ID.
+      The 'object-in-place' predicate is for when the robot should put an object somewhere. If the robot should move an object from one place to another, use 'object-in-place' for the goal instead of 'holding': (holding ...) would leave the object in the gripper instead of putting it down.
 
       Use the same robot name you are sending the goal to. For a robot named hilbert: (at-object hilbert o15) is correct; (at-object o15) is REJECTED.
 
