@@ -15,7 +15,7 @@ agent_info:
       bound_args:
         dsgdb_conf:
           dsg_interface_type: heracles
-          uri: neo4j://$ADT4_HERACLES_IP:7683
+          uri: neo4j://$ADT4_HERACLES_IP:$ADT4_HERACLES_PORT
     # robot_name and planner_topic are intentionally left unbound: bound_args are
     # not env-expanded, so pinning them here ties this config to one robot. Left
     # out, the tool derives them from ADT4_EXECUTOR_ROBOT_NAME / ADT4_ROBOT_NAME,
