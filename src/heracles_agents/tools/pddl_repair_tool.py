@@ -12,39 +12,13 @@ from heracles_agents.tool_interface import FunctionParameter, ToolDescription
 from heracles_agents.tool_registry import register_tool
 
 
-def _default_planner_topic() -> str:
-    """Topic the goal_manager listens on, derived from the running session.
-
-    goal_manager remaps ~/commanded_goal to /$ADT4_ROBOT_NAME/commanded_goal, so
-    the topic namespace is the namespace of the session the planner runs in --
-    on a base station that is the base station's name, not the robot's.
-    """
-    session_name = os.environ.get("ADT4_ROBOT_NAME")
-    if not session_name:
-        raise ValueError(
-            "planner_topic was not bound and ADT4_ROBOT_NAME is unset, so the "
-            "goal_manager topic cannot be derived. Set ADT4_ROBOT_NAME, or bind "
-            "planner_topic explicitly in the agent config."
-        )
-    return f"/{session_name}/commanded_goal"
-
-
-def _default_robot_name() -> str:
-    """Robot the goal is issued to, i.e. goal.robot_id.
-
-    This is not always the session name: on a base station the planner session is
-    named for the base station while the goal targets an actual robot, which is
-    what ADT4_EXECUTOR_ROBOT_NAME carries. In a single-session sim run the two
-    coincide, so fall back to ADT4_ROBOT_NAME.
-    """
-    robot = os.environ.get("ADT4_EXECUTOR_ROBOT_NAME") or os.environ.get(
-        "ADT4_ROBOT_NAME"
-    )
+def _default_robot_name(env_var: str) -> str:
+    """Resolve the target robot from the environment variable named in the config."""
+    robot = os.environ.get(env_var) if env_var else None
     if not robot:
         raise ValueError(
-            "robot_name was not bound and neither ADT4_EXECUTOR_ROBOT_NAME nor "
-            "ADT4_ROBOT_NAME is set, so the target robot is unknown. Set one of "
-            "them, or bind robot_name explicitly in the agent config."
+            "Set the configured robot_name_env_var, or bind robot_name explicitly "
+            "in the agent config."
         )
     return robot
 
@@ -79,14 +53,18 @@ def send_pddl_with_constraints(
     constraints_json: str = "",
     robot_name: str = None,
     planner_topic: str = None,
+    robot_name_env_var: str = "",
 ):
-    # Both stay overridable from the agent config; unbound they follow the
-    # environment, so a config is not pinned to whichever robot it was written
-    # against.
+    # Deployment-specific variable names and the topic template come from YAML.
+    # An explicit robot_name still takes precedence over the environment.
     if robot_name is None:
-        robot_name = _default_robot_name()
-    if planner_topic is None:
-        planner_topic = _default_planner_topic()
+        robot_name = _default_robot_name(robot_name_env_var)
+    planner_topic = os.path.expandvars(planner_topic or "")
+    if not planner_topic or "$" in planner_topic:
+        raise ValueError(
+            "Bind planner_topic in the agent config and set any environment "
+            "variables used in its value."
+        )
 
     constraints_yaml = _constraints_from_json(constraints_json)
     msg_yaml = (
