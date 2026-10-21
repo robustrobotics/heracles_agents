@@ -3,11 +3,15 @@ domain_description: |
       The PDDL domain consists of the following predicates. These predicates get parameterized by symbols from a 3D scene graph.
       IMPORTANT: every ID you use must be a nodeSymbol you actually read from the database, written in LOWERCASE. Never invent an ID, and never change its prefix letter: if a query returns "T4826" you send "t4826", not "p4826". Look IDs up with run_cypher_query rather than guessing them from the examples below.
 
-      CRITICAL -- predicate arity differs. The "visited-" and "safe" predicates take ONLY the target. The "at-" and "holding" predicates take the ROBOT NAME FIRST, then the target. "object-in-place" takes the OBJECT, then the place, and no robot. Using the wrong number of arguments makes the planner reject the problem outright, so copy these shapes exactly:
+      CRITICAL -- predicate arity differs. The "visited-" and "safe" predicates take ONLY the target. The "-by" predicates, "at-" and "holding" take the ROBOT NAME FIRST, then the target. "object-in-place" takes the OBJECT, then the place, and no robot. Using the wrong number of arguments makes the planner reject the problem outright, so copy these shapes exactly:
 
       (visited-place ?t): Some robot visited place ?t at some point, where '?t' is a placeholder for a MeshPlace ID.
       (visited-object ?o): Some robot visited object ?o at some point, where '?o' is a placeholder for an Object ID.
       (safe ?o): Object ?o has been inspected.
+      (visited-place-by ?r ?t): Robot ?r itself visited place ?t at some point.
+      (visited-object-by ?r ?o): Robot ?r itself visited object ?o at some point.
+      (inspected-by ?r ?o): Robot ?r itself inspected object ?o.
+      Use the "-by" forms whenever the user says WHICH robot does a task; use the plain forms only when any robot may do it. The plain forms let the planner pick the robot, and it will not follow the user's assignment.
       (at-place ?r ?t): Robot ?r must END at place ?t, where '?r' is the robot name.
       (at-object ?r ?o): Robot ?r must END at object ?o, where '?r' is the robot name.
       (holding ?r ?o): Robot ?r must be holding object ?o, where '?r' is the robot name.
@@ -16,7 +20,8 @@ domain_description: |
       (object-in-place ?o ?t): Object ?o must end up inside MeshPlace ?t, where '?o' is an Object ID and '?t' is a MeshPlace ID.
       The 'object-in-place' predicate is for when the robot should put an object somewhere. If the robot should move an object from one place to another, use 'object-in-place' for the goal instead of 'holding': (holding ...) would leave the object in the gripper instead of putting it down.
 
-      Use the same robot name you are sending the goal to. For a robot named hilbert: (at-object hilbert o15) is correct; (at-object o15) is REJECTED.
+      Use the robot name the user gave for that task. For a robot named hilbert: (at-object hilbert o15) and (visited-object-by hilbert o15) are correct; (at-object o15) and (visited-object-by o15) are REJECTED.
+      To assign tasks to several robots, put them all in one goal: (and (visited-object-by hamilton o21)(inspected-by gauss o26)).
 
       When an instruction indicates an order, use "at-" predicates for the final destination and "visited-" predicates for intermediate stops.
 

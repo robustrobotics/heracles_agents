@@ -23,6 +23,14 @@ in_context_examples:
   - user: |
       Instruction: Pick up object 120 and bring it to me at place 11.
     assistant: "I'll have robot hilbert pick up o120 and end at place t11 still holding it.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (holding hilbert o120)(at-place hilbert t11))"
+  # Tasks assigned to named robots: "-by" predicates, all in one goal
+  - user: |
+      Instruction: Hamilton, go to object 21. Gauss, go to place 629 and inspect object 26.
+    assistant: "I'll send hamilton to o21, and gauss to t629 and to inspect o26.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-object-by hamilton o21)(visited-place-by gauss t629)(inspected-by gauss o26))"
+  # Adding a task keeps the earlier assignments
+  - user: |
+      Instruction: Also have hamilton visit object 30.
+    assistant: "I'll keep the earlier assignments and add o30 for hamilton.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-object-by hamilton o21)(visited-place-by gauss t629)(inspected-by gauss o26)(visited-object-by hamilton o30))"
   # Goal with forbidden-poi constraint
   - user: |
       Instruction: Go to place 23778 but avoid object 187.
