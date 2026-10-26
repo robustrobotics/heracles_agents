@@ -57,28 +57,28 @@ in_context_examples:
     assistant: "A three-step chain, so two before entries link them.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (object-in-place o16 t4316)(visited-place t4812)(visited-place t4214)) and constraints_json=[[\"before\", \"o16\", \"t4812\"], [\"before\", \"t4812\", \"t4214\"]]"
   # Named robot: the -by form keeps the user's assignment
   - user: |
-      Instruction: Hilbert, go to object 6.
-    assistant: "I'll send hilbert to object o6.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(visited-object-by hilbert o6)"
+      Instruction: Hamilton, go to object 6.
+    assistant: "I'll send hamilton to object o6.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(visited-object-by hamilton o6)"
   # Several robots, each with its own task: one goal for all of them
   - user: |
-      Instruction: Hilbert should visit object 16 and euclid should visit place 4826.
-    assistant: "Both assignments go in one goal, each with its robot.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-object-by hilbert o16)(visited-place-by euclid t4826))"
-  # Both robots to the same target
+      Instruction: Hamilton should visit object 16 and gauss should visit place 4826.
+    assistant: "Both assignments go in one goal, each with its robot.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-object-by hamilton o16)(visited-place-by gauss t4826))"
+  # Several named robots to the same target
   - user: |
-      Instruction: Both robots should go to object 6.
-    assistant: "One visit per robot.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-object-by hilbert o6)(visited-object-by euclid o6))"
+      Instruction: Hamilton and gauss should both go to object 6.
+    assistant: "One visit per robot.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-object-by hamilton o6)(visited-object-by gauss o6))"
   # Named and unnamed tasks together
   - user: |
-      Instruction: Euclid, go to object 5, and someone check whether object 2 is safe.
-    assistant: "The visit is euclid's; the inspection is left to the planner.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-object-by euclid o5)(not (suspicious o2)))"
+      Instruction: Gauss, go to object 5, and someone check whether object 2 is safe.
+    assistant: "The visit is gauss's; the inspection is left to the planner.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-object-by gauss o5)(not (suspicious o2)))"
   # A named robot in an inspection
   - user: |
-      Instruction: Euclid, inspect object 7.
-    assistant: "An inspection is a joint task; the team will include euclid.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(inspected-by euclid o7)"
+      Instruction: Gauss, inspect object 7.
+    assistant: "An inspection is a joint task; the team will include gauss.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(inspected-by gauss o7)"
   # Adding a task: re-send what is still wanted, with its robot
   - user: |
-      Instruction: Also have euclid visit object 10.
-    assistant: "A new goal replaces the old one, so I'll re-send hilbert's visit to o6 together with the new task.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-object-by hilbert o6)(visited-object-by euclid o10))"
+      Instruction: Also have gauss visit object 10.
+    assistant: "A new goal replaces the old one, so I'll re-send hamilton's visit to o6 together with the new task.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-object-by hamilton o6)(visited-object-by gauss o10))"
   # Unspecific target: pick one, since this planner has no "or"
   - user: |
       Instruction: Go to a door.
@@ -87,3 +87,7 @@ in_context_examples:
   - user: |
       Instruction: Visit object 10 and finish at object 6.
     assistant: "This planner cannot require where a robot ends, so I'll visit o6 last. The robot goes there last, but where it stops afterwards is not guaranteed.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-object o10)(visited-object o6)) and constraints_json=[[\"before\", \"o10\", \"o6\"]]"
+  # Robots referred to without names: ask, never guess the fleet
+  - user: |
+      Instruction: Both robots should go to object 6.
+    assistant: "Which robots do you mean? Tell me their names and I'll send each of them to o6."

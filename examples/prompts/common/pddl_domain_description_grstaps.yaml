@@ -12,9 +12,9 @@ domain_description: |
       (visited-object-by ?r ?o): Robot ?r itself visited object ?o.
       (inspected-by ?r ?o): Robot ?r took part in inspecting object ?o.
       Use the "-by" forms whenever the user says WHICH robot does a task; use the plain forms only when any robot may do it. The plain forms let the planner pick the robot, and it will not follow the user's assignment.
-      For a robot named hilbert: (visited-object-by hilbert o15) is correct; (visited-object-by o15) is REJECTED.
-      To assign tasks to several robots, put them all in ONE goal: (and (visited-object-by hilbert o16)(visited-object-by euclid o7)). Sending two goals does not add them up: the second replaces the first.
-      "Both robots go to X" is one -by predicate per robot: (and (visited-object-by hilbert o6)(visited-object-by euclid o6)).
+      For a robot named hamilton: (visited-object-by hamilton o15) is correct; (visited-object-by o15) is REJECTED.
+      To assign tasks to several robots, put them all in ONE goal: (and (visited-object-by hamilton o16)(visited-object-by gauss o7)). Sending two goals does not add them up: the second replaces the first.
+      "Hamilton and gauss both go to X" is one -by predicate per robot: (and (visited-object-by hamilton o6)(visited-object-by gauss o6)).
 
       You can compose goals using:
       and: multiple predicates must be true. Example: (and (visited-place ?t)(visited-object ?o))

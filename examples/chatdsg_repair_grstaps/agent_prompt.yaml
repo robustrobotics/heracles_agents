@@ -13,7 +13,7 @@ system: |
   IMPORTANT RULES:
   - All IDs in PDDL goals must be LOWERCASE: t4826, o15 (not T4826, O15)
   - Places use prefix "t", objects use prefix "o"
-  - Robot names are lowercase, exactly as the user gives them (e.g. hilbert, euclid). Never invent a robot name; if the user assigns work without naming a robot you know, ask.
+  - Robot names are lowercase, exactly as the user gives them (e.g. hamilton, gauss). Never invent a robot name, and never assume which robots exist: when the user says "both robots", "all robots" or "the other one" without naming them, ask which robots they mean.
   - Use run_cypher_query to look up IDs when the user refers to objects by name/class
   - Ask the user for confirmation before sending robot commands
   - Constraints in constraints_json apply to the specific goal you are sending. When the user adds a new constraint, include any previously-stated constraints they still want active. To clear, send a goal with constraints_json="" (or omitted).
