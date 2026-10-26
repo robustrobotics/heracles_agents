@@ -3,25 +3,27 @@ domain_description: |
       The PDDL domain consists of the following predicates. These predicates get parameterized by symbols from a 3D scene graph.
       IMPORTANT: every ID you use must be a nodeSymbol you actually read from the database, written in LOWERCASE. Never invent an ID, and never change its prefix letter: if a query returns "T4826" you send "t4826", not "p4826". Look IDs up with run_cypher_query rather than guessing them from the examples below.
 
-      CRITICAL -- predicate arity differs. The "visited-" and "safe" predicates take ONLY the target. The "at-" and "holding" predicates take the ROBOT NAME FIRST, then the target. Using the wrong number of arguments makes the planner reject the problem outright, so copy these shapes exactly:
+      CRITICAL -- predicate arity differs. The plain "visited-" and "safe" predicates take ONLY the target. The "-by" predicates take the ROBOT NAME FIRST, then the target. Using the wrong number of arguments makes the planner reject the problem outright, so copy these shapes exactly:
 
       (visited-place ?t): Some robot visited place ?t at some point, where '?t' is a placeholder for a MeshPlace ID.
       (visited-object ?o): Some robot visited object ?o at some point, where '?o' is a placeholder for an Object ID.
       (safe ?o): Object ?o has been inspected.
-      (at-place ?r ?t): Robot ?r must END at place ?t, where '?r' is the robot name.
-      (at-object ?r ?o): Robot ?r must END at object ?o, where '?r' is the robot name.
-      (holding ?r ?o): Robot ?r must be holding object ?o, where '?r' is the robot name.
-
-      Use the same robot name you are sending the goal to. For a robot named hilbert: (at-object hilbert o15) is correct; (at-object o15) is REJECTED.
-
-      When an instruction indicates an order, use "at-" predicates for the final destination and "visited-" predicates for intermediate stops.
+      (visited-place-by ?r ?t): Robot ?r itself visited place ?t, where '?r' is the robot name.
+      (visited-object-by ?r ?o): Robot ?r itself visited object ?o.
+      (inspected-by ?r ?o): Robot ?r took part in inspecting object ?o.
+      Use the "-by" forms whenever the user says WHICH robot does a task; use the plain forms only when any robot may do it. The plain forms let the planner pick the robot, and it will not follow the user's assignment.
+      For a robot named hilbert: (visited-object-by hilbert o15) is correct; (visited-object-by o15) is REJECTED.
+      To assign tasks to several robots, put them all in ONE goal: (and (visited-object-by hilbert o16)(visited-object-by euclid o7)). Sending two goals does not add them up: the second replaces the first.
+      "Both robots go to X" is one -by predicate per robot: (and (visited-object-by hilbert o6)(visited-object-by euclid o6)).
 
       You can compose goals using:
       and: multiple predicates must be true. Example: (and (visited-place ?t)(visited-object ?o))
-      or: at least one must be true. Example: (or (visited-place ?t1)(visited-place ?t2))
-      not: negates a predicate. Example: (not (visited-object ?o))
 
-      If the user is not specific about which object or place, use "or" to let the planner decide.
+      This planner does NOT support these, and rejects any goal that uses them:
+      - "or". If the user is not specific about which object or place ("go to a door"), query the candidates and pick ONE of them yourself; say which one you picked.
+      - at-place / at-object (where a robot must END). Visit the final stop with a visited- predicate and order it last with a before constraint; tell the user the robot will go there last but where it stops afterwards is not guaranteed.
+      - holding (pick something up and keep it). Tell the user this planner can only move an object to a place, and offer object-in-place instead.
+      - "not", except (not (suspicious ?o)) described below.
 
       To find the correct place or object IDs, use the run_cypher_query tool to query the scene graph database.
       Example Cypher: MATCH (o:Object) WHERE o.class = 'tree' RETURN o.nodeSymbol
@@ -75,18 +77,18 @@ domain_description: |
         they only said "out of the way". Confirm it exists with run_cypher_query.
         Only a robot with a manipulator can do this. If the fleet has none the plan fails, which
         is correct -- do not silently downgrade it to a visit.
-      - (holding ?r ?o) -- pick object ?o up, when the user wants it lifted but named no
-        destination. ?r is the robot name.
       - (not (suspicious ?o)) -- inspect object ?o. This is a joint task: several robots must
-        be there together at the same moment. Which robots is decided by the planner from the
-        fleet's configuration, so never name them. If the fleet cannot field such a team the
-        plan fails, which is correct -- do not silently downgrade it to a visit.
+        be there together at the same moment. The planner picks the team. If the user names a
+        robot for it, use (inspected-by ?r ?o) instead: the team then includes that robot. If
+        the fleet cannot field such a team the plan fails, which is correct -- do not silently
+        downgrade it to a visit.
 
       Physical ordering is automatic: an object is picked up before it is set down, and an
       inspection of an object precedes a pick of it. Do not add before constraints for that.
       Use before only for ordering the user asked for between DIFFERENT targets.
 
       A negated goal is not achievable. "(not (visited-place ?t))" asks for a place NOT to be
-      visited, which no plan can bring about; it is ignored with a warning. The only negation
-      that means anything is (not (suspicious ?o)), which is how an inspection is stated.
+      visited, which no plan can bring about, and the planner rejects it. To keep a robot away
+      from somewhere, use a forbidden-poi constraint. The only negation that means anything is
+      (not (suspicious ?o)), which is how an inspection is stated.
   </Moving and Inspecting Things>
