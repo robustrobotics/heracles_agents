@@ -1,0 +1,100 @@
+domain_description: |
+  <PDDL Domain>
+      The PDDL domain consists of the following predicates. These predicates get parameterized by symbols from a 3D scene graph.
+      IMPORTANT: every ID you use must be a nodeSymbol you actually read from the database, written in LOWERCASE. Never invent an ID, and never change its prefix letter: if a query returns "T4826" you send "t4826", not "p4826". Look IDs up with run_cypher_query rather than guessing them from the examples below.
+
+      CRITICAL -- predicate arity differs. The plain "visited-" and "safe" predicates take ONLY the target. The "-by" predicates take the ROBOT NAME FIRST, then the target. Using the wrong number of arguments makes the planner reject the problem outright, so copy these shapes exactly:
+
+      (visited-place ?t): Some robot visited place ?t at some point, where '?t' is a placeholder for a MeshPlace ID.
+      (visited-object ?o): Some robot visited object ?o at some point, where '?o' is a placeholder for an Object ID.
+      (safe ?o): Object ?o has been inspected.
+      (visited-place-by ?r ?t): Robot ?r itself visited place ?t, where '?r' is the robot name.
+      (visited-object-by ?r ?o): Robot ?r itself visited object ?o.
+      (inspected-by ?r ?o): Robot ?r took part in inspecting object ?o.
+      (visited-region ?g): Some robot went into region ?g (a Room node, 'r(X)' lowercased). The planner sends one robot to a place in the middle part of the region.
+      (explored-region ?g): The robots covered region ?g: the planner spreads visits over the region (waypoints about 8 m apart) and splits them between robots.
+      (visited-region-by ?r ?g) / (explored-region-by ?r ?g): The same, done by robot ?r itself.
+      Use the region forms when the user names a room or area ("go to the kitchen", "search the loading dock"), not a single place inside it. Look the region up with: MATCH (g:Room) RETURN g.nodeSymbol, g.class, g.center
+      Region goals only work on maps that have Room nodes; if the query returns none, tell the user this map has no regions.
+      Use the "-by" forms whenever the user says WHICH robot does a task; use the plain forms only when any robot may do it. The plain forms let the planner pick the robot, and it will not follow the user's assignment.
+      For a robot named hamilton: (visited-object-by hamilton o15) is correct; (visited-object-by o15) is REJECTED.
+      For a region: (explored-region-by hamilton r3) is correct; (explored-region-by r3) is REJECTED.
+      To assign tasks to several robots, put them all in ONE goal: (and (visited-object-by hamilton o16)(visited-object-by gauss o7)). Sending two goals does not add them up: the second replaces the first.
+      "Hamilton and gauss both go to X" is one -by predicate per robot: (and (visited-object-by hamilton o6)(visited-object-by gauss o6)).
+
+      You can compose goals using:
+      and: multiple predicates must be true. Example: (and (visited-place ?t)(visited-object ?o))
+
+      This planner does NOT support these, and rejects any goal that uses them:
+      - "or". If the user is not specific about which object or place ("go to a door"), query the candidates and pick ONE of them yourself; say which one you picked.
+      - at-place / at-object (where a robot must END). Visit the final stop with a visited- predicate and order it last with a before constraint; tell the user the robot will go there last but where it stops afterwards is not guaranteed.
+      - holding (pick something up and keep it). Tell the user this planner can only move an object to a place, and offer object-in-place instead.
+      - "not", except (not (suspicious ?o)) described below.
+
+      To find the correct place or object IDs, use the run_cypher_query tool to query the scene graph database.
+      Example Cypher: MATCH (o:Object) WHERE o.class = 'tree' RETURN o.nodeSymbol
+      Example Cypher: MATCH (p:MeshPlace) RETURN p.nodeSymbol LIMIT 10
+  </PDDL Domain>
+
+  <Runtime Constraints>
+      In addition to goals, you can specify runtime constraints to forbid the robot from visiting certain locations or edges.
+      Constraints are passed as a JSON list via the constraints_json parameter to send_pddl_goal_with_constraints.
+
+      Constraint types:
+      - forbidden-poi: forbids the robot from visiting (or transiting through) a specific place or object.
+        Example: [["forbidden-poi", "?o"]] forbids the object with ID ?o.
+        Example: [["forbidden-poi", "?t"]] forbids the place with ID ?t.
+      - forbidden-edge: forbids the robot from traversing the edge between two points.
+        Example: [["forbidden-edge", "?t1", "?t2"]] blocks the corridor between places ?t1 and ?t2.
+        NOTE: forbidden-edge is unordered. You only need ONE direction, not both.
+      - before: orders the work. [["before", "?a", "?b"]] means everything the plan does at ?a
+        finishes before anything it does at ?b starts. ?a and ?b are ordinary place or object IDs,
+        the same ones used in the goal.
+        Use it whenever the user says one thing must happen FIRST, or must happen AFTER another.
+        Order cannot be expressed in the goal itself: a goal states what must be true at the END,
+        not the sequence, so ordering always rides here as a constraint.
+        One entry per pair. For "do A and B, then C" send two entries:
+          [["before", "?a", "?c"], ["before", "?b", "?c"]]
+        For a chain "A then B then C" send [["before","?a","?b"], ["before","?b","?c"]].
+        Never send both directions for one pair -- ["before","?a","?b"] together with
+        ["before","?b","?a"] is a contradiction and the planner fails outright.
+
+      ALL constraint IDs must be LOWERCASE, and must be nodeSymbols that exist in the database. A constraint naming an ID that is not in the graph is silently ignored, so the robot will not avoid it -- always confirm the ID with run_cypher_query first.
+
+      When the user says:
+      - "avoid object X" or "don't go near place Y" -> use forbidden-poi
+      - "that path is blocked" or "the corridor between A and B is closed" -> use forbidden-edge (a single entry)
+      - "do X first", "then", "after that", "once X is done" -> use before
+
+      Constraints scoped to a single goal: pass them in constraints_json alongside the goal.
+      The user does not need to re-state existing constraints when sending a new goal.
+
+      You can also send a goal with no constraints — just pass an empty string for constraints_json
+      (or omit the parameter entirely).
+  </Runtime Constraints>
+
+  <Moving and Inspecting Things>
+      Beyond visiting, the goal can ask for objects to be moved or checked. Use these only when
+      the user actually asks for them.
+
+      - (object-in-place ?o ?p) -- relocation. Take object ?o and leave it at place ?p.
+        Use for "move X out of the way", "clear X", "put X over at Y".
+        ?p is a place ID: use the one the user named, or a clear place away from the work if
+        they only said "out of the way". Confirm it exists with run_cypher_query.
+        Only a robot with a manipulator can do this. If the fleet has none the plan fails, which
+        is correct -- do not silently downgrade it to a visit.
+      - (not (suspicious ?o)) -- inspect object ?o. This is a joint task: several robots must
+        be there together at the same moment. The planner picks the team. If the user names a
+        robot for it, use (inspected-by ?r ?o) instead: the team then includes that robot. If
+        the fleet cannot field such a team the plan fails, which is correct -- do not silently
+        downgrade it to a visit.
+
+      Physical ordering is automatic: an object is picked up before it is set down, and an
+      inspection of an object precedes a pick of it. Do not add before constraints for that.
+      Use before only for ordering the user asked for between DIFFERENT targets.
+
+      A negated goal is not achievable. "(not (visited-place ?t))" asks for a place NOT to be
+      visited, which no plan can bring about, and the planner rejects it. To keep a robot away
+      from somewhere, use a forbidden-poi constraint. The only negation that means anything is
+      (not (suspicious ?o)), which is how an inspection is stated.
+  </Moving and Inspecting Things>

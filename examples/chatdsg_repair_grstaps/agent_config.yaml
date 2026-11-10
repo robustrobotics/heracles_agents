@@ -1,0 +1,65 @@
+---
+client:
+  client_type: openai
+    # auth key is supplied by HERACLES_OPENAI_API_KEY
+  timeout: 20
+model_info:
+  model: gpt-4.1
+  temperature: 0.2
+  seed: 123
+agent_info:
+  prompt_settings:
+    base_prompt: agent_prompt.yaml
+  tools:
+    - name: run_cypher_query
+      bound_args:
+        dsgdb_conf:
+          dsg_interface_type: heracles
+          uri: neo4j://$ADT4_HERACLES_IP:$ADT4_HERACLES_PORT
+    - name: add_scene_object
+      bound_args:
+        dsgdb_conf:
+          dsg_interface_type: heracles
+          uri: neo4j://$ADT4_HERACLES_IP:$ADT4_HERACLES_PORT
+    - name: add_scene_place
+      bound_args:
+        dsgdb_conf:
+          dsg_interface_type: heracles
+          uri: neo4j://$ADT4_HERACLES_IP:$ADT4_HERACLES_PORT
+    - name: move_scene_object
+      bound_args:
+        dsgdb_conf:
+          dsg_interface_type: heracles
+          uri: neo4j://$ADT4_HERACLES_IP:$ADT4_HERACLES_PORT
+    - name: remove_scene_object
+      bound_args:
+        dsgdb_conf:
+          dsg_interface_type: heracles
+          uri: neo4j://$ADT4_HERACLES_IP:$ADT4_HERACLES_PORT
+    - name: remove_scene_place
+      bound_args:
+        dsgdb_conf:
+          dsg_interface_type: heracles
+          uri: neo4j://$ADT4_HERACLES_IP:$ADT4_HERACLES_PORT
+    - name: connect_scene_places
+      bound_args:
+        dsgdb_conf:
+          dsg_interface_type: heracles
+          uri: neo4j://$ADT4_HERACLES_IP:$ADT4_HERACLES_PORT
+    - name: disconnect_scene_places
+      bound_args:
+        dsgdb_conf:
+          dsg_interface_type: heracles
+          uri: neo4j://$ADT4_HERACLES_IP:$ADT4_HERACLES_PORT
+    # Undo and reset are services of the scene change writer, which rebuilds the map.
+    - name: undo_scene_edit
+    - name: clear_scene_edits
+    - name: reset_scene_graph
+    - name: send_pddl_goal_with_constraints
+      bound_args:
+        # Bind robot_name directly to override this environment variable.
+        robot_name_env_var: ADT4_ROBOT_NAME
+        # This tool expands environment variables in planner_topic at call time.
+        planner_topic: /$ADT4_ROBOT_NAME/commanded_goal
+  tool_interface: openai
+  max_iterations: 6
