@@ -55,6 +55,18 @@ in_context_examples:
   - user: |
       Instruction: Clear object 16 to place 4316, then visit place 4812, and only after that go to place 4214.
     assistant: "A three-step chain, so two before entries link them.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (object-in-place o16 t4316)(visited-place t4812)(visited-place t4214)) and constraints_json=[[\"before\", \"o16\", \"t4812\"], [\"before\", \"t4812\", \"t4214\"]]"
+  # A named robot moves the object: object-placed-by (robot first)
+  - user: |
+      Instruction: Have euclid move object 58 to place 1253.
+    assistant: "Euclid is named for the move, so the goal binds it to euclid.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(object-placed-by euclid o58 t1253)"
+  # A robot named only for the visit: the move stays object-in-place
+  - user: |
+      Instruction: Hamilton should go look at object 58, and object 12 should end up at place 1253.
+    assistant: "Hamilton is named only for the visit; any robot may move o12.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-object-by hamilton o58)(object-in-place o12 t1253))"
+  # "Put X at Y": the place closest to Y, not X's own place
+  - user: |
+      Instruction: Put the cone next to object 7.
+    assistant: "I need the cone's id, the place it is in now, and the MeshPlace closest to o7. Let me query them.\n\nUsing run_cypher_query to find the cone and the places nearest O7; I'll use the closest place that is not the cone's own place, then send (object-in-place <cone> <that place>)"
   # Named robot: the -by form keeps the user's assignment
   - user: |
       Instruction: Hamilton, go to object 6.

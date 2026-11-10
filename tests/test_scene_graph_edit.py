@@ -37,6 +37,7 @@ def query():
 def _clear():
     gate.allowed = gate.wrote = gate.user_turn = False
     gate.last_goal = gate.pending = gate.report = gate.call_writer = None
+    gate.check_goal = None
     gate.context = gate.last_context = None
     gate._proposed = {}
 
@@ -245,3 +246,82 @@ def test_a_goal_remembers_what_was_asked_and_from_where(query):
 
 def test_no_note_before_any_goal():
     assert goal_context_note(None) == ""
+
+
+# ---------- goals naming robots, regions or ids the map does not have ----------
+
+
+class _MapDb:
+    def __init__(self, robots=("testbot_b", "testbot_a"), rooms=("R1", "R3")):
+        self.robots, self.rooms = robots, rooms
+        self.symbols = {"o58", "t2249", "t1253"}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        pass
+
+    def query(self, cypher):
+        if "Robot" in cypher:
+            return [{"n": r} for r in self.robots]
+        if "Room" in cypher:
+            return [{"s": r} for r in self.rooms]
+        return [{"s": s} for s in self.symbols if f"'{s}'" in cypher]
+
+
+@pytest.fixture
+def map_db(monkeypatch):
+    import heracles_agents.scene_graph_edit as sge
+
+    db = _MapDb()
+    monkeypatch.setattr(sge, "_connect", lambda conf: db)
+    return db
+
+
+def test_a_misspelled_robot_is_caught_with_the_known_names(map_db):
+    from heracles_agents.scene_graph_edit import goal_problems
+
+    problem = goal_problems("(visited-object-by testbot_am o58)", "", None)
+    assert "unknown robot testbot_am" in problem and "testbot_a, testbot_b" in problem
+    problem = goal_problems(
+        "(object-in-place o58 t2249)", '[["use-robots", "testbot_x"]]', None
+    )
+    assert "unknown robot testbot_x" in problem
+    assert goal_problems("(object-placed-by testbot_a o58 t2249)", "", None) == ""
+
+
+def test_regions_are_checked_against_the_rooms(map_db):
+    from heracles_agents.scene_graph_edit import goal_problems
+
+    assert goal_problems("(visited-region r3)", "", None) == ""
+    assert goal_problems("(explored-region-by testbot_b r(1))", "", None) == ""
+    assert "unknown region r7" in goal_problems("(visited-region r7)", "", None)
+    map_db.rooms = ()
+    assert "no regions" in goal_problems("(visited-region r3)", "", None)
+
+
+def test_ids_the_map_lacks_are_caught(map_db):
+    from heracles_agents.scene_graph_edit import goal_problems
+
+    assert "o99 not in the scene graph" in goal_problems(
+        "(object-in-place o99 t2249)", "", None
+    )
+
+
+def test_no_robot_nodes_means_no_robot_check(map_db):
+    from heracles_agents.scene_graph_edit import goal_problems
+
+    map_db.robots = ()
+    assert goal_problems("(visited-object-by anyone o58)", "", None) == ""
+
+
+def test_a_goal_with_a_problem_is_never_held_or_sent(query, map_db):
+    from heracles_agents.scene_graph_edit import goal_problems
+
+    send, sent = _sender()
+    gate.check_goal = lambda g, c: goal_problems(g, c, None)
+    gate.start_turn(user_turn=True)
+    out = send("(visited-object-by testbot_am o58)")
+    assert out.startswith("NOT SENT: unknown robot testbot_am")
+    assert gate.pending is None and sent == []

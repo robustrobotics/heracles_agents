@@ -30,6 +30,7 @@ from heracles_agents.scene_change_listener import REPORT_PREFIX, SceneChangeList
 from heracles_agents.scene_graph_edit import (
     gate,
     goal_context_note,
+    goal_problems,
     goal_symbols,
     install,
     missing_symbols,
@@ -61,6 +62,11 @@ class RepairChatApp(mod.InputDisplayApp):
         gate.report = self._listener.publish_applied
         # Undo and reset are rebuilt by the scene change writer.
         gate.call_writer = self._listener.call_writer
+        # Unknown robots, regions and ids are caught before a goal is shown.
+        conf = self.agent.agent_info.tools["run_cypher_query"]._bound_args
+        gate.check_goal = lambda goal, constraints: goal_problems(
+            goal, constraints, conf["dsgdb_conf"]
+        )
 
     def on_unmount(self) -> None:
         self._listener.stop()

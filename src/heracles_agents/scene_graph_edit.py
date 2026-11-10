@@ -13,12 +13,16 @@ scene change writer can rebuild the map from the prior scene graph without
 it: undo and reset are its services, which the chat calls (gate.call_writer).
 
 An edit changes the same map change detection does, so it is announced the
-same way: the objects it removed, added or moved go out as a scene change
-(source "sget/chat") through gate.report, and the planner judges them against
-the running plan -- a deleted object the plan picks pauses the robots.
+same way: the objects and places it removed, added or moved go out as a scene
+change (source "sget/chat") through gate.report, and the planner judges them
+against the running plan -- a deleted object the plan picks, or a deleted
+place its route crosses, pauses the robots. A connection edit is announced
+with no changes, as a new map version.
 
-After a write the map version is bumped, so the heracles publisher republishes
-the edited map at once instead of at its next period. A plan already running
+The edit, its change log entry and the version bump are one transaction
+(heracles_ros.map_state.map_edit), refused while the map is being rebuilt or
+reloaded. The bump is notify_map_change, so the heracles publisher republishes
+the edited map at once and the console's viewers see it too. A plan already running
 is not changed by the edit, so after an edit the chat offers to send the last
 goal again (resend_offer); the goal manager replans it on the edited map.
 """
@@ -84,6 +88,9 @@ class EditGate:
         # call_writer(service) -> (ok, message): a scene change writer service
         # ("undo_last_edit", "clear_edits", "reset").
         self.call_writer = None
+        # check_goal(goal, constraints_json) -> why it cannot be planned, or
+        # "": robots, regions and ids the map does not have (goal_problems).
+        self.check_goal = None
         # Goals are sent only once the user confirmed them: turn counts agent
         # turns, user_turn says whether a user message (not only a scene change
         # report) began this one, and pending is (goal key, turn shown).
@@ -160,6 +167,73 @@ def goal_context_note(context) -> str:
 def goal_symbols(goal: str) -> list:
     """The object and place ids a PDDL goal names, e.g. ["o16", "t4"]."""
     return sorted(set(re.findall(r"\b[ot]\d+\b", goal or "")))
+
+
+# Predicates whose first argument is a robot, and those naming a region last.
+_ROBOT_FIRST = re.compile(
+    r"\((?:visited-(?:object|place|poi|region)-by|explored-region-by|inspected-by"
+    r"|at-place|at-object|holding|object-placed-by)\s+([^\s()]+)",
+    re.IGNORECASE,
+)
+_REGION = re.compile(
+    r"\((?:visited|explored)-region(?:-by\s+[^\s()]+)?\s+([^\s()]+(?:\(\d+\))?)",
+    re.IGNORECASE,
+)
+
+
+def _region_key(symbol: str) -> str:
+    """'R3', 'r3' and 'r(3)' are the same region."""
+    return re.sub(r"[()\s]", "", symbol).lower()
+
+
+def goal_problems(goal: str, constraints_json, dsgdb_conf) -> str:
+    """Why the planner would reject this goal on the current map, or "".
+
+    Checks what it can cheaply: robot names against the Robot nodes (one per
+    fleet robot, kept by the state updater), region symbols against the Room
+    nodes, and object and place ids. A part with nothing to check against (no
+    Robot nodes yet) is not checked.
+    """
+    robots = {r.lower() for r in _ROBOT_FIRST.findall(goal or "")}
+    try:
+        facts = json.loads(constraints_json) if constraints_json else []
+    except ValueError:
+        facts = []
+    for fact in facts:
+        if isinstance(fact, list) and fact and str(fact[0]).lower() == "use-robots":
+            robots.update(str(r).lower() for r in fact[1:])
+    regions = {_region_key(g): g for g in _REGION.findall(goal or "")}
+    problems = []
+    with _connect(dsgdb_conf) as db:
+        if robots:
+            rows = db.query("MATCH (r:Robot) RETURN r.name AS n")
+            known = sorted({str(r["n"]).lower() for r in rows if r["n"]})
+            unknown = sorted(robots - set(known))
+            if known and unknown:
+                problems.append(
+                    f"unknown robot {', '.join(unknown)} (known robots: "
+                    f"{', '.join(known)}). Ask the user which robot they mean."
+                )
+        if regions:
+            rows = db.query("MATCH (g:Room) RETURN g.nodeSymbol AS s")
+            known = sorted({_region_key(str(r["s"])) for r in rows if r["s"]})
+            unknown = sorted(g for k, g in regions.items() if k not in known)
+            if unknown and not known:
+                problems.append(
+                    f"region {', '.join(unknown)} named, but this map has no regions "
+                    "(no Room nodes)."
+                )
+            elif unknown:
+                problems.append(
+                    f"unknown region {', '.join(unknown)} (regions in the map: "
+                    f"{', '.join(known)})."
+                )
+    missing = missing_symbols(goal_symbols(goal), dsgdb_conf)
+    if missing:
+        problems.append(
+            f"{', '.join(missing)} not in the scene graph: look the ids up again."
+        )
+    return " ".join(problems)
 
 
 def resend_offer(last_goal, missing=()) -> str:
@@ -245,26 +319,42 @@ def gated(query_fn):
 def _editing(dsgdb_conf, edit) -> str:
     """Run one map edit as SGET: refuse outside SGET, log it, bump, announce, check.
 
-    edit(db) returns (message, object_changes); object_changes None means
-    nothing was changed and message says why.
+    edit(db) returns (message, changes); changes None means nothing was
+    changed and message says why. changes are applied records (objects or
+    places) to announce; [] announces just the new version.
     """
     if not gate.allowed:
         return REFUSED
-    from heracles_ros.map_state import bump_map_version, is_rebuilding
+    from heracles_ros.map_state import map_edit, notify_map_change
 
     with _connect(dsgdb_conf) as db:
-        if is_rebuilding(db):
-            return REBUILDING
-        message, changes = edit(db)
-        if changes is None:
-            return message
-        version = bump_map_version(db)
+        with map_edit(db) as tx:
+            if tx is None:
+                return REBUILDING
+            message, changes = edit(tx)
+            if changes is None:
+                return message
+            version = notify_map_change(tx)
     gate.wrote = True
-    if gate.report and changes:
+    if gate.report:
         gate.report(changes, version)
     problem = _map_problem(dsgdb_conf)
     done = f"{message} (map_version {version}). It can be undone with undo_scene_edit."
     return f"{done}\n{broken_map_warning(problem)}" if problem else done
+
+
+def _place_center(db, symbol):
+    rows = db.execute(
+        "MATCH (p:MeshPlace) WHERE toLower(p.nodeSymbol) = $s RETURN p.center AS c",
+        s=(symbol or "").strip().lower(),
+    )[0]
+    c = rows[0]["c"] if rows else None
+    return None if c is None else (c.x, c.y, c.z)
+
+
+def _place_change(kind, symbol, old=None, new=None) -> dict:
+    """A place edit as an applied record, announced like an object change."""
+    return {"kind": kind, "symbol": symbol, "label": "place", "old": old, "new": new}
 
 
 def _record(db, op, data):
@@ -425,7 +515,7 @@ def add_scene_place(
         return (
             f"Added place {added['symbol']} at ({x}, {y}), connected to "
             f"{', '.join(neighbours)}",
-            [],
+            [_place_change(ADDED, added["symbol"], new=(float(x), float(y), 0.0))],
         )
 
     return _editing(dsgdb_conf, edit)
@@ -462,6 +552,7 @@ def remove_scene_place(symbol: str, dsgdb_conf: HeraclesDsgInterface = None) -> 
     def edit(db):
         from heracles_ros.scene_change import remove_place
 
+        was_at = _place_center(db, symbol)
         removed = remove_place(db, symbol)
         if removed is None:
             return f"Refused: there is no place {symbol.strip().lower()}.", None
@@ -473,7 +564,7 @@ def remove_scene_place(symbol: str, dsgdb_conf: HeraclesDsgInterface = None) -> 
         )
         return (
             f"Deleted place {removed['symbol']} and its {removed['edges']} edges{moved}",
-            [],
+            [_place_change(REMOVED, removed["symbol"], old=was_at)],
         )
 
     return _editing(dsgdb_conf, edit)
@@ -640,6 +731,14 @@ def confirming(send_fn):
         # kwargs are the tool's bound args (robot_name, planner_topic,
         # robot_name_env_var, ...), passed through as the config gives them.
         key = goal_key(pddl_goal_string, constraints_json)
+        problem = ""
+        if gate.check_goal is not None:
+            try:
+                problem = gate.check_goal(pddl_goal_string, constraints_json)
+            except Exception:
+                problem = ""  # Neo4j unavailable: the planner still checks
+        if problem:
+            return f"NOT SENT: {problem}"
         confirmed = (
             gate.user_turn
             and gate.pending is not None

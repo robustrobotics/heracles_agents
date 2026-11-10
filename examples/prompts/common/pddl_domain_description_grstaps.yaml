@@ -81,6 +81,19 @@ domain_description: |
         Use for "move X out of the way", "clear X", "put X over at Y".
         ?p is a place ID: use the one the user named, or a clear place away from the work if
         they only said "out of the way". Confirm it exists with run_cypher_query.
+        For "put X at Y" where Y is an object or a named thing, ?p is the MeshPlace closest to Y:
+        MATCH (y:Object {nodeSymbol: 'O7'}), (p:MeshPlace) RETURN p.nodeSymbol, point.distance(p.center, y.center) AS d ORDER BY d LIMIT 3.
+        Never use the place X is in now (MATCH (p:MeshPlace)-[:CONTAINS]->(:Object {nodeSymbol: 'O58'}) RETURN p.nodeSymbol):
+        that goal is already true, so the robot would do nothing. If the closest place to Y is X's own
+        place, take the next closest and tell the user which place you chose.
+      - (object-placed-by ?r ?o ?p) -- the same relocation, done by robot ?r itself. Robot name FIRST.
+        Use it ONLY when the user clearly names the robot that should move the object: "hamilton, put
+        the cone at the gate", "have euclid move o58 to t1253" -> (object-placed-by euclid o58 t1253).
+        Use object-in-place when no robot is named for the move, or the robot is only implied ("the
+        nearest robot", "someone", "a spot"). Never infer or pick the robot yourself, and never use the
+        base station or planner host (e.g. willow) as the robot. A robot named only for another part of
+        the request does not make the move its own: "Hamilton should go look at o58, and the cone should
+        end up at t1253" is (and (visited-object-by hamilton o58)(object-in-place o<cone> t1253)).
         Only a robot with a manipulator can do this. If the fleet has none the plan fails, which
         is correct -- do not silently downgrade it to a visit.
       - (not (suspicious ?o)) -- inspect object ?o. This is a joint task: several robots must

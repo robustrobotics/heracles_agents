@@ -3,7 +3,7 @@ domain_description: |
       The PDDL domain consists of the following predicates. These predicates get parameterized by symbols from a 3D scene graph.
       IMPORTANT: every ID you use must be a nodeSymbol you actually read from the database, written in LOWERCASE. Never invent an ID, and never change its prefix letter: if a query returns "T4826" you send "t4826", not "p4826". Look IDs up with run_cypher_query rather than guessing them from the examples below.
 
-      CRITICAL -- predicate arity differs. The "visited-" and "safe" predicates take ONLY the target. The "-by" predicates, "at-" and "holding" take the ROBOT NAME FIRST, then the target. "object-in-place" takes the OBJECT, then the place, and no robot. Using the wrong number of arguments makes the planner reject the problem outright, so copy these shapes exactly:
+      CRITICAL -- predicate arity differs. The "visited-" and "safe" predicates take ONLY the target. The "-by" predicates, "at-" and "holding" take the ROBOT NAME FIRST, then the target. "object-in-place" takes the OBJECT, then the place, and no robot. "object-placed-by" takes the ROBOT, then the object, then the place. Using the wrong number of arguments makes the planner reject the problem outright, so copy these shapes exactly:
 
       (visited-place ?t): Some robot visited place ?t at some point, where '?t' is a placeholder for a MeshPlace ID.
       (visited-object ?o): Some robot visited object ?o at some point, where '?o' is a placeholder for an Object ID.
@@ -19,6 +19,11 @@ domain_description: |
 
       (object-in-place ?o ?t): Object ?o must end up inside MeshPlace ?t, where '?o' is an Object ID and '?t' is a MeshPlace ID.
       The 'object-in-place' predicate is for when the robot should put an object somewhere. If the robot should move an object from one place to another, use 'object-in-place' for the goal instead of 'holding': (holding ...) would leave the object in the gripper instead of putting it down.
+      (object-placed-by ?r ?o ?t): Robot ?r itself must move object ?o and put it down inside MeshPlace ?t. Robot name FIRST, then the object, then the place.
+      Use 'object-placed-by' ONLY when the user clearly names the robot that should move the object: "hamilton, put the cone at the gate" or "have euclid move o58 to t1253" -> (object-placed-by euclid o58 t1253).
+      Use 'object-in-place' when no robot is named for the move, or the robot is only implied ("the nearest robot", "someone", "a spot"). Never infer or pick the robot yourself, and never use the base station or planner host (e.g. willow) as the robot.
+      A robot named only for another part of the request does not make the move its own: "Hamilton should go look at o58, and the cone should end up at t1253" is (and (visited-object-by hamilton o58)(object-in-place o<cone> t1253)), not object-placed-by.
+      Choosing ?t for "put X at Y" / "move X to Y": ?t is where the user means Y. If Y is a place ID, use it. If Y is an object or a named thing, use the MeshPlace closest to it: MATCH (y:Object {nodeSymbol: 'O7'}), (p:MeshPlace) RETURN p.nodeSymbol, point.distance(p.center, y.center) AS d ORDER BY d LIMIT 3. Never use the place X is in now (MATCH (p:MeshPlace)-[:CONTAINS]->(:Object {nodeSymbol: 'O58'}) RETURN p.nodeSymbol): that goal is already true, so the robot would do nothing. If the closest place to Y is X's own place, take the next closest and tell the user which place you chose.
 
       Use the robot name the user gave for that task. For a robot named hilbert: (at-object hilbert o15) and (visited-object-by hilbert o15) are correct; (at-object o15) and (visited-object-by o15) are REJECTED.
       To assign tasks to several robots, put them all in one goal: (and (visited-object-by hamilton o21)(inspected-by gauss o26)).
