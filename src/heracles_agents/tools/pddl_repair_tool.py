@@ -84,7 +84,12 @@ def send_pddl_with_constraints(
     print(f"[pddl_repair_tool] cmd: {' '.join(cmd)}")
     subprocess.run(cmd)
 
-    result = f"Sent goal {pddl_goal_string} to robot {robot_name}"
+    # robot_name is where the goal manager runs, often a base station, not a
+    # robot. Saying "to robot willow" made the agent treat willow as one.
+    result = (
+        f"Sent goal {pddl_goal_string} to the planner on {robot_name}; "
+        "the goal decides which robots act"
+    )
     if constraints_json:
         result += f" with constraints {constraints_json}"
     return result
