@@ -309,12 +309,35 @@ def test_ids_the_map_lacks_are_caught(map_db):
     )
 
 
+@pytest.mark.parametrize("goal", ["(visited-object O999)", "(visited-place T999)"])
+def test_uppercase_goal_ids_the_map_lacks_are_caught(map_db, goal):
+    from heracles_agents.scene_graph_edit import goal_problems
+
+    assert "not in the scene graph" in goal_problems(goal, "", None)
+
+
+def test_valid_uppercase_ids_pass_validation(map_db):
+    from heracles_agents.scene_graph_edit import goal_problems
+
+    assert (
+        goal_problems(
+            "(object-in-place O58 T2249)",
+            '[["forbidden-edge", "T2249", "T1253"]]',
+            None,
+        )
+        == ""
+    )
+
+
 @pytest.mark.parametrize(
     "constraints, missing",
     [
         ('[["forbidden-poi", "o999"]]', "o999"),
         ('[["forbidden-edge", "t999", "t1253"]]', "t999"),
         ('[["before", "o999", "t1253"]]', "o999"),
+        ('[["forbidden-poi", "O999"]]', "o999"),
+        ('[["forbidden-edge", "T999", "T1253"]]', "t999"),
+        ('[["before", "O999", "T1253"]]', "o999"),
     ],
 )
 def test_ids_a_constraint_names_are_checked_too(map_db, constraints, missing):

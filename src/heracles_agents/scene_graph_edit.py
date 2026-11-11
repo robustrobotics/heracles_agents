@@ -165,8 +165,8 @@ def goal_context_note(context) -> str:
 
 
 def goal_symbols(goal: str) -> list:
-    """The object and place ids a PDDL goal names, e.g. ["o16", "t4"]."""
-    return sorted(set(re.findall(r"\b[ot]\d+\b", goal or "")))
+    """The object and place ids a PDDL goal names, normalized to lowercase."""
+    return sorted(set(re.findall(r"\b[ot]\d+\b", (goal or "").lower())))
 
 
 # Predicates whose first argument is a robot, and those naming a region last.
