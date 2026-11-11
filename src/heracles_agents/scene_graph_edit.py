@@ -199,9 +199,16 @@ def goal_problems(goal: str, constraints_json, dsgdb_conf) -> str:
         facts = json.loads(constraints_json) if constraints_json else []
     except ValueError:
         facts = []
+    # Ids a constraint names (forbidden-poi, forbidden-edge, before, ...): one
+    # the map lacks matches nothing in the planner, so the constraint is lost.
+    constraint_ids = set()
     for fact in facts:
-        if isinstance(fact, list) and fact and str(fact[0]).lower() == "use-robots":
+        if not isinstance(fact, list) or not fact:
+            continue
+        if str(fact[0]).lower() == "use-robots":
             robots.update(str(r).lower() for r in fact[1:])
+        else:
+            constraint_ids.update(goal_symbols(" ".join(str(a) for a in fact[1:])))
     regions = {_region_key(g): g for g in _REGION.findall(goal or "")}
     problems = []
     with _connect(dsgdb_conf) as db:
@@ -228,7 +235,9 @@ def goal_problems(goal: str, constraints_json, dsgdb_conf) -> str:
                     f"unknown region {', '.join(unknown)} (regions in the map: "
                     f"{', '.join(known)})."
                 )
-    missing = missing_symbols(goal_symbols(goal), dsgdb_conf)
+    missing = missing_symbols(
+        sorted(set(goal_symbols(goal)) | constraint_ids), dsgdb_conf
+    )
     if missing:
         problems.append(
             f"{', '.join(missing)} not in the scene graph: look the ids up again."

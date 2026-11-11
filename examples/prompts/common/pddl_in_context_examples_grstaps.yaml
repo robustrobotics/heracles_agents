@@ -63,10 +63,10 @@ in_context_examples:
   - user: |
       Instruction: Hamilton should go look at object 58, and object 12 should end up at place 1253.
     assistant: "Hamilton is named only for the visit; any robot may move o12.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-object-by hamilton o58)(object-in-place o12 t1253))"
-  # "Put X at Y": the place closest to Y, not X's own place
+  # "Put X at Y": the place closest to Y; if that is X's own place, X is already there
   - user: |
       Instruction: Put the cone next to object 7.
-    assistant: "I need the cone's id, the place it is in now, and the MeshPlace closest to o7. Let me query them.\n\nUsing run_cypher_query to find the cone and the places nearest O7; I'll use the closest place that is not the cone's own place, then send (object-in-place <cone> <that place>)"
+    assistant: "I need the cone's id, the place it is in now, and the MeshPlace closest to o7. Let me query them.\n\nUsing run_cypher_query to find the cone and the places nearest O7; I'll send (object-in-place <cone> <the closest place>). If the closest place is the one the cone is already in, the cone is already next to o7: I'll say so and send nothing."
   # Named robot: the -by form keeps the user's assignment
   - user: |
       Instruction: Hamilton, go to object 6.

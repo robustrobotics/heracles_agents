@@ -309,6 +309,27 @@ def test_ids_the_map_lacks_are_caught(map_db):
     )
 
 
+@pytest.mark.parametrize(
+    "constraints, missing",
+    [
+        ('[["forbidden-poi", "o999"]]', "o999"),
+        ('[["forbidden-edge", "t999", "t1253"]]', "t999"),
+        ('[["before", "o999", "t1253"]]', "o999"),
+    ],
+)
+def test_ids_a_constraint_names_are_checked_too(map_db, constraints, missing):
+    from heracles_agents.scene_graph_edit import goal_problems
+
+    problem = goal_problems("(visited-place t1253)", constraints, None)
+    assert f"{missing} not in the scene graph" in problem
+    assert (
+        goal_problems(
+            "(visited-place t1253)", '[["forbidden-edge", "t2249", "t1253"]]', None
+        )
+        == ""
+    )
+
+
 def test_no_robot_nodes_means_no_robot_check(map_db):
     from heracles_agents.scene_graph_edit import goal_problems
 

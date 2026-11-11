@@ -83,9 +83,10 @@ domain_description: |
         they only said "out of the way". Confirm it exists with run_cypher_query.
         For "put X at Y" where Y is an object or a named thing, ?p is the MeshPlace closest to Y:
         MATCH (y:Object {nodeSymbol: 'O7'}), (p:MeshPlace) RETURN p.nodeSymbol, point.distance(p.center, y.center) AS d ORDER BY d LIMIT 3.
-        Never use the place X is in now (MATCH (p:MeshPlace)-[:CONTAINS]->(:Object {nodeSymbol: 'O58'}) RETURN p.nodeSymbol):
-        that goal is already true, so the robot would do nothing. If the closest place to Y is X's own
-        place, take the next closest and tell the user which place you chose.
+        Do not use the place X is in now (MATCH (p:MeshPlace)-[:CONTAINS]->(:Object {nodeSymbol: 'O58'}) RETURN p.nodeSymbol)
+        instead of Y's place: that goal is already true, so the robot would do nothing. If the place closest
+        to Y IS X's place, X is already at Y: send no goal, tell the user X is already there, and ask
+        whether they want it moved to a specific place.
       - (object-placed-by ?r ?o ?p) -- the same relocation, done by robot ?r itself. Robot name FIRST.
         Use it ONLY when the user clearly names the robot that should move the object: "hamilton, put
         the cone at the gate", "have euclid move o58 to t1253" -> (object-placed-by euclid o58 t1253).
