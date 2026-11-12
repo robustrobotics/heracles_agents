@@ -54,14 +54,48 @@ rules:
       "The cone nearest to the robots" chooses the cone, not the robot: compare over all
       robots and keep the robot-free form.
   - text: >-
-      "Both robots", "hamilton and euclid", "with A and B" (no task given to each), or
-      "only X" / "just X": use the robot-free forms plus a use-robots constraint naming exactly
+      "Both robots", "hamilton and euclid", "with A and B" (no task given to each) for work to
+      share out over several targets, or "only X" / "just X": use the robot-free forms plus a
+      use-robots constraint naming exactly
       those robots (use-robots euclid hamilton). Only they act, and the planner splits the work
       between them. When the user also gives tasks to named robots and wants the others kept
       out, add use-robots as well. Leave use-robots out when the user does not limit the
-      robots. "Both robots" / "all robots" without names are the robots of the fleet
-      (MATCH (r:Robot) RETURN r.name); ask which ones only when that is not clear, e.g.
-      "both" in a fleet of three.
+      robots.
+  - text: >-
+      Several robots that must EACH go to, visit, check or inspect the SAME target ("hamilton
+      and euclid go to O3", "both robots look at O7"): one -by atom per robot, in one goal,
+      (and (visited-object-by hamilton o3) (visited-object-by euclid o3)), and no use-robots.
+      A robot-free (visited-object o3) is done as soon as ONE robot gets there, with or without
+      use-robots, so the other robot would never go.
+  - text: >-
+      "All robots", "the team", "everyone", without names, does not limit the robots: leave
+      use-robots out and the planner uses every robot that can do the work. "Both robots" /
+      "the two robots", without names, are the two robots that can do the task: for picking
+      up, holding or moving an object, the two with an arm; ask which ones only when more than
+      two can do it. Never put a husky in use-robots, and never give one a task by name,
+      unless the user names it ("gauss", "the husky"). Tell the user which robots you used.
+  - engines: [fast_downward]
+    text: >-
+      When the user leaves the target open ("a trash can", "a different cone each", "any
+      chair"), you choose: one specific target for each named robot, the nearest first (the
+      distance query above), different targets when the user says different, and tell the user
+      which you chose. "Send hamilton to a trash can and euclid to a different one" is
+      (and (visited-object-by hamilton o4) (visited-object-by euclid o8)). Do not list the
+      alternatives in an or: the only or is the two-robots-two-objects case of the holding
+      rule below.
+  - engines: [grstaps]
+    text: >-
+      When the user leaves the target open ("a trash can", "a different cone each", "any
+      chair"), you choose: one specific target for each named robot, the nearest first (the
+      distance query above), different targets when the user says different, and tell the user
+      which you chose. "Send hamilton to a trash can and euclid to a different one" is
+      (and (visited-object-by hamilton o4) (visited-object-by euclid o8)).
+  - text: >-
+      Constraints are written in these rules in short form, (use-robots euclid hamilton). The
+      tool takes them in its own form, and it is the same constraint: as a JSON list,
+      ["use-robots", "euclid", "hamilton"], or, in the ADT4 console, as an object
+      {predicate, symbols}: {predicate: 'use-robots', symbols: ['euclid', 'hamilton']}. Never
+      put a constraint inside the PDDL goal.
   - engines: [grstaps]
     text: >-
       GRSTAPS-X refuses a use-robots goal that does not fit it. A robot named in a -by form or
@@ -132,7 +166,13 @@ rules:
       robot, or robot-free), and the constraints still wanted (use-robots, forbidden-*).
   - text: >-
       Robot names are lowercase, exactly as the user gives them (e.g. hamilton, gauss). Use
-      only robots of the fleet (MATCH (r:Robot) RETURN r.name). If the user names a robot
+      only robots of the fleet. The fleet is ONE list: the fleet roster in this prompt when
+      it has one, otherwise the Robot nodes (MATCH (r:Robot) RETURN r.name). With a roster,
+      the Robot nodes only say where robots are (positions, distances): a roster robot with no
+      Robot node, or one the roster marks offline, is a known robot that is offline or has no
+      position yet -- say that; never call it unknown or "not in the fleet". A platform word
+      ("the spots", "the huskies") means the roster's online robots of that platform. If the
+      user names a robot
       that is not in it (a typo such as "hamiltonm"), ask which robot they mean and list the
       known ones; never guess, and never invent a robot name. The base station or planner
       host (e.g. willow) is not a robot: never put it in a goal.
@@ -146,6 +186,15 @@ examples:
   - user: Split the 4 cones among both
     goal: the same kind of ONE robot-free goal over those 4 cones
     note: plus (use-robots euclid hamilton); the planner does the split, never divide them yourself
+  - user: Hamilton and euclid, go to O3
+    goal: (and (visited-object-by hamilton o3) (visited-object-by euclid o3))
+    note: both must go, so one -by atom per robot and no use-robots; (visited-object o3) is done once one robot gets there
+  - user: All robots visit all the trash cans (trash cans O4, O8, O15)
+    goal: (and (visited-object o4) (visited-object o8) (visited-object o15))
+    note: all robots is the whole team, so no use-robots (and never a husky in use-robots unless the user names it)
+  - user: Send hamilton to a trash can and euclid to a different one (trash cans O4, O8, O15)
+    goal: (and (visited-object-by hamilton o4) (visited-object-by euclid o8))
+    note: you choose, nearest first, and say which; never an or over the pairs
   - user: Only euclid should visit O2
     goal: (visited-object o2)
     note: plus the constraint (use-robots euclid)

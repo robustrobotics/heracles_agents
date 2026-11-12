@@ -208,25 +208,33 @@ FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures",
                        "fast_downward_prompts_095df69.json")  # fmt: skip
 
 
-def test_fast_downward_text_is_byte_identical_to_095df69():
-    """The GRSTAPS-X holding / use-robots change leaves every Fast Downward text as
-    it was at 095df69 (the fixture is that commit's rendered text)."""
+# The two team goal rules the 2026-11-12 follow-up rewrote (use-robots; robot
+# names and the fleet). Every other Fast Downward line is as it was at 095df69.
+_REWRITTEN_RULES = ('- "Both robots", "hamilton and euclid"', "- Robot names are lowercase")
+
+
+def test_fast_downward_text_is_as_at_095df69_but_for_the_rewritten_rules():
+    """The GRSTAPS-X holding / use-robots change left every Fast Downward text as
+    it was at 095df69 (the fixture is that commit's rendered text). Since then
+    only the team goal rules changed: two rules were rewritten and rules and
+    examples were added; the domain and the in-context examples are untouched."""
     with open(FIXTURE, encoding="utf-8") as f:
         before = json.load(f)
     e = "fast_downward"
-    now = {
-        "commit": before["commit"],
-        "team_goal_rules": prompts.team_goal_rules(e),
-        "domain_description": prompts.domain_description(e),
-        "in_context_examples": prompts.in_context_examples(e),
-        "repair_goal_prompt": prompts.repair_goal_prompt(e),
-        "repair_goal_prompt_console": prompts.repair_goal_prompt(
-            e, names={"send_pddl_goal_with_constraints": "propose_goal"}
-        ),
-        "repair_chat_prompt": prompts.repair_chat_prompt(e),
-    }
-    for key in before:
-        assert now[key] == before[key], key
+    assert prompts.domain_description(e) == before["domain_description"]
+    assert prompts.in_context_examples(e) == before["in_context_examples"]
+    now = prompts.team_goal_rules(e).splitlines()
+    kept = [
+        line
+        for line in before["team_goal_rules"].splitlines()
+        if not line.startswith(_REWRITTEN_RULES)
+    ]
+    assert len(kept) == len(before["team_goal_rules"].splitlines()) - 2
+    assert [line for line in kept if line not in now] == []
+    # and in the same order
+    assert [line for line in now if line in kept] == kept
+    for text in (prompts.repair_goal_prompt(e), prompts.repair_chat_prompt(e)["system"]):
+        assert prompts.team_goal_rules(e) in text
 
 
 _EACH_CONE = (
@@ -311,3 +319,69 @@ def test_chatdsg_repair_grstaps_builds_from_the_package_text():
     rules = prompts.team_goal_rules("grstaps")
     assert rules in chat["system"]
     assert "a -by or holding robot left out of use-robots is an error" in chat["system"]
+
+
+# ---------- 2026-11-11 rig test: wrong or odd constraints and robot lists ----------
+
+
+@pytest.mark.parametrize("engine", prompts.ENGINES)
+def test_rules_for_several_robots_one_target_and_for_all_robots(engine):
+    text = prompts.team_goal_rules(engine)
+    # (a) the same target for several robots: one -by atom per robot
+    assert "one -by atom per robot, in one goal" in text
+    assert (
+        '- "Hamilton and euclid, go to O3": '
+        "(and (visited-object-by hamilton o3) (visited-object-by euclid o3))"
+    ) in text
+    assert "is done as soon as ONE robot gets there" in text
+    # use-robots stays for work shared out over several targets and for "only X"
+    assert "for work to share out over several targets" in text
+    assert '"only X" / "just X"' in text
+    assert '- "Visit all the chairs with both euclid and hamilton' in text
+    # (b) "all robots" does not limit the team; no husky unless named
+    assert "does not limit the robots: leave use-robots out" in text
+    assert "Never put a husky in use-robots" in text
+    assert "unless the user names it" in text
+    assert "Tell the user which robots you used" in text
+    assert (
+        '- "All robots visit all the trash cans (trash cans O4, O8, O15)": '
+        "(and (visited-object o4) (visited-object o8) (visited-object o15))"
+    ) in text
+    # (c) one robot list; an offline robot is not an unknown one
+    assert "The fleet is ONE list: the fleet roster in this prompt when it has one" in text
+    assert 'never call it unknown or "not in the fleet"' in text
+    assert "are the robots of the fleet (MATCH (r:Robot)" not in text
+    # (d) a concrete choice per robot, not an enumeration
+    assert "one specific target for each named robot, the nearest first" in text
+    assert (
+        '- "Send hamilton to a trash can and euclid to a different one '
+        '(trash cans O4, O8, O15)": '
+        "(and (visited-object-by hamilton o4) (visited-object-by euclid o8))"
+    ) in text
+    # (e) the console's constraint form, stated once
+    assert text.count("{predicate, symbols}") == 1
+    assert "{predicate: 'use-robots', symbols: ['euclid', 'hamilton']}" in text
+
+
+def test_only_fast_downward_is_told_about_its_one_or():
+    assert "the only or is the two-robots-two-objects case" in prompts.team_goal_rules(
+        "fast_downward"
+    )
+    grstaps = prompts.team_goal_rules("grstaps")
+    assert "the only or is" not in grstaps
+    assert "(or " not in grstaps.split("Examples (")[1]
+
+
+@pytest.mark.parametrize("engine", prompts.ENGINES)
+def test_renaming_the_tools_keeps_the_constraint_forms_apart(engine):
+    """The console renames constraints_json to constraints: the rule must not
+    then say the console's parameter takes the JSON-list form."""
+    text = prompts.repair_goal_prompt(
+        engine,
+        names={
+            "send_pddl_goal_with_constraints": "propose_goal",
+            "constraints_json": "constraints",
+        },
+    )
+    rule = next(line for line in text.splitlines() if "{predicate, symbols}" in line)
+    assert "constraints takes" not in rule and "constraints_json" not in rule
