@@ -41,9 +41,16 @@ _SCENE_GRAPH = {
 }
 
 
+class UnsupportedEngineError(ValueError):
+    """The caller asked for the goal rules of a planner engine not in ENGINES."""
+
+
 def _engine(engine: str) -> str:
     if engine not in ENGINES:
-        raise ValueError(f"unknown planner engine {engine!r}: use one of {ENGINES}")
+        raise UnsupportedEngineError(
+            f"heracles_agents has no PDDL goal rules for the planner engine "
+            f"{engine!r}: use one of {ENGINES}"
+        )
     return engine
 
 
