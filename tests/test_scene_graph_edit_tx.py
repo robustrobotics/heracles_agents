@@ -42,6 +42,8 @@ class _Db:
         raise AssertionError(query)
 
     def execute(self, query, **kw):
+        if "SET m.version" in query:  # newer heracles bumps the version with execute
+            return self.query(query), None, None
         if "_State" in query and "MATCH (s:" in query:
             self.console += 1
         elif "CREATE CONSTRAINT" in query:
