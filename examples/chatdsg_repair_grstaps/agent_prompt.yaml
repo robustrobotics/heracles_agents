@@ -1,9 +1,0 @@
-# The plan-repair chat's prompt is installed with heracles_agents, so every chat
-# that sends goals to the goal manager (this one and the ADT4 web console) uses
-# the same rules: heracles_agents.prompts.repair_chat_prompt("grstaps") gives the
-# system text with the team goal rules, the scene graph and Cypher descriptions,
-# the PDDL domain and the in-context examples (src/heracles_agents/prompts/).
-# Fields below are added to it or override it.
-repair_chat_prompt: grstaps
-labelspace_description: ${HERACLES_EVALUATION_PATH}/examples/prompts/common/building_45_labelspace.yaml
-novel_instruction_template: '{question}'

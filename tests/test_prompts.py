@@ -15,9 +15,6 @@ CHATS = {
     "fast_downward": os.path.join(
         ROOT, "examples", "chatdsg_repair", "agent_prompt.yaml"
     ),
-    "grstaps": os.path.join(
-        ROOT, "examples", "chatdsg_repair_grstaps", "agent_prompt.yaml"
-    ),
 }
 _ROBOT_FIRST = re.compile(
     r"\((?:visited-object-by|visited-place-by|inspected-by|visited-region-by|"
@@ -54,17 +51,11 @@ def _rules_in(text, engine):
     assert "that is not in it" in text and "ask which robot they mean" in text
     assert "without naming a robot you know, ask" not in text
     assert "then give the task to that robot with a -by predicate" not in text
-    # both engines take use-robots (GRSTAPS-X: the robots it leaves out get empty plans)
     assert "plus a use-robots constraint naming exactly" in text
     assert '"Visit all the chairs with both euclid and hamilton' in text
     assert "no use-robots constraint" not in text
     if engine == "fast_downward":
         assert "holding / at-place / at-object" in text
-    else:
-        for form in ("visited-region-by", "explored-region-by", "(visited-region r)",
-                     "(explored-region r)"):  # fmt: skip
-            assert form in text, form
-        assert "to move an object) or holding." in text
 
 
 @pytest.mark.parametrize("engine", prompts.ENGINES)
@@ -121,10 +112,6 @@ def test_chatdsg_repair_prompt_comes_from_the_package(engine, monkeypatch):
     if engine == "fast_downward":
         assert '["use-robots", "<name>", ...]' in prompt.system
         assert "This graph has no Room nodes" in prompt.system
-    else:
-        assert "Use only region symbols the scene graph has" in prompt.system
-        assert "Rooms (regions) are labeled" in prompt.system
-        assert '["use-robots", "<name>", ...]' in prompt.system
 
 
 @pytest.mark.parametrize("engine", prompts.ENGINES)
@@ -175,24 +162,8 @@ def test_fast_downward_rules_map_end_or_stay_to_at_predicates():
     _fast_downward_at_rules_in(prompts.team_goal_rules("fast_downward"))
 
 
-def test_grstaps_rules_explain_the_limit_and_name_fast_downward():
-    text = prompts.team_goal_rules("grstaps")
-    assert "GRSTAPS-X cannot hold a robot at a final position" in text
-    assert "Fast Downward can (the console's planner toggle)" in text
-    assert "before constraint" in text
-    assert 'Never say that "the system" or "the interface" does not support' in text
-    for example in _AT_EXAMPLES:
-        assert example not in text
-    examples = text.split("Examples (")[1]
-    assert "(at-place" not in examples and "(at-object" not in examples
-    assert _GO_TO_O21 in text
-
-
 def test_chatdsg_repair_has_the_at_rules():
     _fast_downward_at_rules_in(prompts.repair_chat_prompt("fast_downward")["system"])
-    grstaps = prompts.repair_chat_prompt("grstaps")["system"]
-    assert "Fast Downward can (the console's planner toggle)" in grstaps
-    assert "(at-object euclid o20)" not in grstaps
 
 
 def test_fast_downward_domain_uses_at_for_end_or_stay():
@@ -203,7 +174,7 @@ def test_fast_downward_domain_uses_at_for_end_or_stay():
     assert "when the user wants a robot to end or stay somewhere" in text
 
 
-# ------------------------------------------- GRSTAPS-X: holding and use-robots
+# ------------------------------------- Fast Downward text against 095df69
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures",
                        "fast_downward_prompts_095df69.json")  # fmt: skip
 
@@ -214,8 +185,8 @@ _REWRITTEN_RULES = ('- "Both robots", "hamilton and euclid"', "- Robot names are
 
 
 def test_fast_downward_text_is_as_at_095df69_but_for_the_rewritten_rules():
-    """The GRSTAPS-X holding / use-robots change left every Fast Downward text as
-    it was at 095df69 (the fixture is that commit's rendered text). Since then
+    """Every Fast Downward text was as at 095df69 when the fixture was added
+    (the fixture is that commit's rendered text). Since then
     only the team goal rules changed: two rules were rewritten and rules and
     examples were added; the domain and the in-context examples are untouched."""
     with open(FIXTURE, encoding="utf-8") as f:
@@ -235,90 +206,6 @@ def test_fast_downward_text_is_as_at_095df69_but_for_the_rewritten_rules():
     assert [line for line in now if line in kept] == kept
     for text in (prompts.repair_goal_prompt(e), prompts.repair_chat_prompt(e)["system"]):
         assert prompts.team_goal_rules(e) in text
-
-
-_EACH_CONE = (
-    '- "Each of hamilton and euclid pick up a different cone (cones O1, O20)": '
-    "(and (holding hamilton o1) (holding euclid o20))"
-)
-
-
-def test_grstaps_rules_take_holding_and_use_robots():
-    text = prompts.team_goal_rules("grstaps")
-    # holding: a specific robot for each cone, no or
-    assert "GRSTAPS-X has no or" in text
-    assert "names a specific robot for each cone" in text
-    assert _EACH_CONE in text
-    assert '- "Hamilton, pick up O1": (holding hamilton o1)' in text
-    assert (
-        '- "Hamilton picks up O1, euclid picks up O20": '
-        "(and (holding hamilton o1) (holding euclid o20))"
-    ) in text
-    assert "(object-placed-by <robot> o t) or (object-in-place o t), not holding" in text
-    assert "ask which robot should hold it" in text
-    # the GRSTAPS-X use-robots errors
-    assert "a -by or holding robot left out of use-robots is an error" in text
-    assert "is busy, or is a husky (GRSTAPS-X plans no husky) is an error" in text
-    assert "has no pose" in text
-    examples = text.split("Examples (")[1]
-    assert "(or " not in examples
-    # the limits, explained up front
-    assert "explain the one that applies up front, before proposing" in text
-    assert "the robot that holds does nothing else in that plan" in text
-    assert "one holding goal per robot" in text
-    assert "an object cannot be both held and placed" in text
-    assert "never a husky, and never a robot without a manipulator" in text
-    # use-robots, as for Fast Downward
-    assert '- "Only euclid should visit O2": (visited-object o2) (plus the constraint (use-robots euclid))' in text
-    # still no at-* (GRSTAPS-X refuses them)
-    assert "GRSTAPS-X cannot hold a robot at a final position" in text
-    assert "(at-place" not in examples and "(at-object" not in examples
-
-
-def test_grstaps_domain_takes_holding_and_use_robots_not_or_or_at():
-    text = prompts.domain_description("grstaps")
-    assert "(holding ?r ?o): Robot ?r picks object ?o up and still holds it" in text
-    assert "The robot that holds does nothing else in that plan" in text
-    assert "One holding goal per robot" in text
-    assert "An object cannot be both held and placed" in text
-    assert "never a husky, and never a robot without a manipulator" in text
-    assert "(and (holding hamilton o1)(holding euclid o20))" in text
-    assert '- use-robots: only the robots it names act in this goal' in text
-    unsupported = text.split("This planner does NOT support these")[1].split("To find")[0]
-    assert '- "or".' in unsupported and "- at-place / at-object" in unsupported
-    assert "holding" not in unsupported
-    assert "or:" not in text  # no "or" composition offered
-
-
-def test_grstaps_examples_hold_with_a_named_robot_per_object():
-    goals = "\n".join(e["assistant"] for e in prompts.in_context_examples("grstaps"))
-    assert "pddl_goal_string=(holding hamilton o4)" in goals
-    assert "(and (holding hamilton o1)(holding euclid o20))" in goals
-    assert '[[\"use-robots\", \"hamilton\", \"euclid\"]]' in goals
-    assert "(or " not in goals and "(at-place" not in goals and "(at-object" not in goals
-
-
-@pytest.mark.parametrize("names", [None, {"send_pddl_goal_with_constraints": "propose_goal"}])
-def test_grstaps_repair_goal_prompt_supports_holding_and_use_robots(names):
-    text = prompts.repair_goal_prompt("grstaps", names=names)
-    # supported
-    assert "(holding ?r ?o): Robot ?r picks object ?o up" in text
-    assert "- use-robots: only the robots it names act in this goal" in text
-    assert "plus a use-robots constraint naming exactly" in text
-    assert "to move an object) or holding." in text
-    assert "has no use-robots" not in text and "no use-robots constraint" not in text
-    unsupported = text.split("This planner does NOT support these")[1].split("To find")[0]
-    assert "holding" not in unsupported
-    # still refused
-    assert '- "or".' in unsupported and "- at-place / at-object" in unsupported
-    assert "GRSTAPS-X cannot hold a robot at a final position" in text
-
-
-def test_chatdsg_repair_grstaps_builds_from_the_package_text():
-    chat = prompts.repair_chat_prompt("grstaps")
-    rules = prompts.team_goal_rules("grstaps")
-    assert rules in chat["system"]
-    assert "a -by or holding robot left out of use-robots is an error" in chat["system"]
 
 
 # ---------- 2026-11-11 rig test: wrong or odd constraints and robot lists ----------
@@ -367,9 +254,6 @@ def test_only_fast_downward_is_told_about_its_one_or():
     assert "the only or is the two-robots-two-objects case" in prompts.team_goal_rules(
         "fast_downward"
     )
-    grstaps = prompts.team_goal_rules("grstaps")
-    assert "the only or is" not in grstaps
-    assert "(or " not in grstaps.split("Examples (")[1]
 
 
 @pytest.mark.parametrize("engine", prompts.ENGINES)
