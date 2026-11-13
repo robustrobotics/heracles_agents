@@ -82,8 +82,12 @@ def test_repair_goal_prompt_renames_tools_for_another_chat():
 
 
 def test_unknown_engine_is_an_error():
-    with pytest.raises(ValueError):
+    """An error the caller can show or catch (a ValueError, as before), naming
+    the engine asked for and the ones there are."""
+    with pytest.raises(prompts.UnsupportedEngineError) as e:
         prompts.repair_goal_prompt("fd")
+    assert isinstance(e.value, ValueError)
+    assert "'fd'" in str(e.value) and "fast_downward" in str(e.value)
 
 
 def test_descriptions():
