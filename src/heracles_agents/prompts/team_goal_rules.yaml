@@ -1,0 +1,236 @@
+# Who does what in a PDDL goal sent to the plan-repair goal manager.
+#
+# Every chat that sends such goals follows these rules: examples/chatdsg_repair,
+# examples/chatdsg_repair_grstaps and the ADT4 web console (adt4_console), all
+# through heracles_agents.prompts. A rule without `engines` applies to both
+# engines: fast_downward (multi-robot Fast Downward) and grstaps (GRSTAPS-X).
+# Goals are written the way the planner takes them: lowercase ids, robot first.
+title: "TEAM GOALS (who does what):"
+rules:
+  - text: >-
+      One goal per request covers the whole team: the planner plans for every robot at once,
+      and a new goal replaces the whole team's current plan. Put every robot's tasks in ONE
+      goal, (and ...). Never send one goal per robot: the second one replaces the first
+      (sending (visited-object-by hamilton o1) and then (visited-object-by euclid o20) apart
+      cancels hamilton's visit).
+  - engines: [fast_downward]
+    text: >-
+      If the user says which robot does a task, the goal MUST name that robot: the -by forms
+      (visited-object-by, visited-place-by, inspected-by, and object-placed-by to move an
+      object) or holding / at-place / at-object. Robot name FIRST, then the target:
+      (visited-object-by hamilton o21). A goal without the robot's name lets the planner give
+      the task to any robot, and it will ignore the user's assignment.
+  - engines: [grstaps]
+    text: >-
+      If the user says which robot does a task, the goal MUST name that robot: the -by forms
+      (visited-object-by, visited-place-by, inspected-by, visited-region-by,
+      explored-region-by, and object-placed-by to move an object) or holding. Robot name FIRST,
+      then the target: (visited-object-by hamilton o21). A goal without the robot's name lets the
+      planner give the task to any robot, and it will ignore the user's assignment.
+  - engines: [fast_downward]
+    text: >-
+      If the user names no robot for a task, use the robot-free forms -- (visited-object o),
+      (visited-place t), and (object-in-place o t) to move an object -- and let the planner
+      allocate it. To look at or inspect an object with no robot named, use
+      (visited-object o): inspected-by needs a robot.
+  - engines: [grstaps]
+    text: >-
+      If the user names no robot for a task, use the robot-free forms -- (visited-object o),
+      (visited-place t), (object-in-place o t) to move an object, (visited-region r),
+      (explored-region r), and (not (suspicious o)) to inspect -- and let the planner
+      allocate it.
+  - text: >-
+      Never pick a robot yourself for work the user did not assign: not the nearest robot, not
+      the selected robot, not the robot talked about last. Never split the targets between
+      robots yourself either. "Visit all cones" (cones O1 ... O15) is ONE goal,
+      (and (visited-object o1) (visited-object o2) ... (visited-object o15)), with no -by form
+      and no robot.
+  - text: >-
+      Use the nearest robot only when the user explicitly asks for it ("send the nearest robot
+      to o5") for a visit or an inspection: find it over all robots, MATCH (r:Robot),
+      (o:Object {nodeSymbol: 'O5'}) RETURN r.name, point.distance(r.position, o.center) AS d
+      ORDER BY d LIMIT 1, give that robot the task with a -by form, and tell the user which
+      robot it is. To move an object, "the nearest robot" still means object-in-place.
+      "The cone nearest to the robots" chooses the cone, not the robot: compare over all
+      robots and keep the robot-free form.
+  - text: >-
+      "Both robots", "hamilton and euclid", "with A and B" (no task given to each) for work to
+      share out over several targets, or "only X" / "just X": use the robot-free forms plus a
+      use-robots constraint naming exactly
+      those robots (use-robots euclid hamilton). Only they act, and the planner splits the work
+      between them. When the user also gives tasks to named robots and wants the others kept
+      out, add use-robots as well. Leave use-robots out when the user does not limit the
+      robots.
+  - text: >-
+      Several robots that must EACH go to, visit, check or inspect the SAME target ("hamilton
+      and euclid go to O3", "both robots look at O7"): one -by atom per robot, in one goal,
+      (and (visited-object-by hamilton o3) (visited-object-by euclid o3)), and no use-robots.
+      A robot-free (visited-object o3) is done as soon as ONE robot gets there, with or without
+      use-robots, so the other robot would never go.
+  - text: >-
+      "All robots", "the team", "everyone", without names, does not limit the robots: leave
+      use-robots out and the planner uses every robot that can do the work. "Both robots" /
+      "the two robots", without names, are the two robots that can do the task: for picking
+      up, holding or moving an object, the two with an arm; ask which ones only when more than
+      two can do it. Never put a husky in use-robots, and never give one a task by name,
+      unless the user names it ("gauss", "the husky"). Tell the user which robots you used.
+  - engines: [fast_downward]
+    text: >-
+      When the user leaves the target open ("a trash can", "a different cone each", "any
+      chair"), you choose: one specific target for each named robot, the nearest first (the
+      distance query above), different targets when the user says different, and tell the user
+      which you chose. "Send hamilton to a trash can and euclid to a different one" is
+      (and (visited-object-by hamilton o4) (visited-object-by euclid o8)). Do not list the
+      alternatives in an or: the only or is the two-robots-two-objects case of the holding
+      rule below.
+  - engines: [grstaps]
+    text: >-
+      When the user leaves the target open ("a trash can", "a different cone each", "any
+      chair"), you choose: one specific target for each named robot, the nearest first (the
+      distance query above), different targets when the user says different, and tell the user
+      which you chose. "Send hamilton to a trash can and euclid to a different one" is
+      (and (visited-object-by hamilton o4) (visited-object-by euclid o8)).
+  - text: >-
+      Constraints are written in these rules in short form, (use-robots euclid hamilton). The
+      tool takes them in its own form, and it is the same constraint: as a JSON list,
+      ["use-robots", "euclid", "hamilton"], or, in the ADT4 console, as an object
+      {predicate, symbols}: {predicate: 'use-robots', symbols: ['euclid', 'hamilton']}. Never
+      put a constraint inside the PDDL goal.
+  - engines: [grstaps]
+    text: >-
+      GRSTAPS-X refuses a use-robots goal that does not fit it. A robot named in a -by form or
+      in holding must also be in use-robots: a -by or holding robot left out of use-robots is
+      an error. And use-robots must name at least one robot that can take part: a list where
+      every robot has no pose, is busy, or is a husky (GRSTAPS-X plans no husky) is an error.
+      Check both before proposing.
+  - text: >-
+      Moving an object: when the user names the robot that should move it, use
+      (object-placed-by <robot> <object> <place>); otherwise use (object-in-place <object>
+      <place>) and let the planner pick the robot. A robot named only for another part of the
+      request does not make the move its own: "hamilton looks at o58, and o12 should end up at
+      t1253" is (and (visited-object-by hamilton o58) (object-in-place o12 t1253)).
+  - text: >-
+      "Put X at Y" / "move X to Y": the place is the MeshPlace closest to Y (or Y itself if Y
+      is a place), never the place X is in now (that goal is already true, so nothing would
+      happen). If the place closest to Y is X's own place, X is already at Y: send no goal,
+      say so, and ask whether the user wants it moved to a specific place. The domain
+      description has the queries.
+  - engines: [fast_downward]
+    text: >-
+      Picking up and keeping an object (holding) needs a robot: the domain has no robot-free
+      holding. When the user wants the object taken somewhere, (object-in-place o t) needs no
+      robot. "Each of hamilton and euclid pick up a different cone": ONE goal; with two robots
+      and two cones let the planner choose who takes which, (or (and (holding hamilton o1)
+      (holding euclid o20)) (and (holding hamilton o20) (holding euclid o1))); with more robots
+      or cones give each named robot a different cone, nearest first, in one goal,
+      (and (holding hamilton o1) (holding euclid o20)). If the user only says "pick up X"
+      with no robot and no destination, ask which robot should hold it.
+  - engines: [grstaps]
+    text: >-
+      Picking up and keeping an object (holding <robot> <object>) needs a robot: the domain has
+      no robot-free holding. When the user wants the object taken somewhere, use
+      (object-placed-by <robot> o t) or (object-in-place o t), not holding. GRSTAPS-X has no or, so you decide who takes what: "each of hamilton
+      and euclid pick up a different cone" is ONE goal that names a specific robot for each
+      cone, nearest first, (and (holding hamilton o1) (holding euclid o20)). If the user only
+      says "pick up X" with no robot and no destination, ask which robot should hold it.
+      GRSTAPS-X's holding limits -- explain the one that applies up front, before proposing:
+      the robot that holds does nothing else in that plan (no other task and no -by goal for
+      it; give the other tasks to other robots); one holding goal per robot, and one robot per
+      object; an object cannot be both held and placed (no holding together with
+      object-in-place / object-placed-by for the same object); only a robot with an arm can
+      hold: never a husky, and never a robot without a manipulator. A request that needs
+      more (one robot holding two objects, holding plus other tasks for the holder) does not
+      fit GRSTAPS-X: say so and offer object-in-place, another robot, or Fast Downward (the
+      console's planner toggle).
+  - engines: [fast_downward]
+    text: >-
+      Ending or staying somewhere: when the user wants a named robot to END or STAY at a place
+      or object ("be at", "stay at", "end at", "wait at", "park at", "stop at", "block",
+      "stand by", "go to X and stay"), use (at-place <robot> <t>) / (at-object <robot> <o>):
+      that robot ends there. "Go to", "visit", "check" or "look at" (go there, then be free)
+      stay visited-*-by / visited-* as above. If the user explicitly asks for the at predicate,
+      use it. at-place / at-object always need a robot: if the user names none, ask which robot
+      should end there (as for holding).
+  - engines: [grstaps]
+    text: >-
+      Ending or staying somewhere ("be at", "stay at", "end at", "wait at", "park at", "stop
+      at", "block", "stand by", "go to X and stay", or the at predicate by name): GRSTAPS-X
+      cannot hold a robot at a final position (it takes no at-place / at-object); Fast Downward
+      can (the console's planner toggle). Tell the user so, and offer the substitute: visit it
+      last with a visited- predicate and a before constraint, so the robot goes there last but
+      where it stops afterwards is not guaranteed. Never say that "the system" or "the
+      interface" does not support at-place / at-object: only GRSTAPS-X does not.
+  - text: >-
+      A new goal replaces the old one. When the user adds a task, re-send the tasks of the
+      last goal that are still wanted together with the new one, each as it was (with its
+      robot, or robot-free), and the constraints still wanted (use-robots, forbidden-*).
+  - text: >-
+      Robot names are lowercase, exactly as the user gives them (e.g. hamilton, gauss). Use
+      only robots of the fleet. The fleet is ONE list: the fleet roster in this prompt when
+      it has one, otherwise the Robot nodes (MATCH (r:Robot) RETURN r.name). With a roster,
+      the Robot nodes only say where robots are (positions, distances): a roster robot with no
+      Robot node, or one the roster marks offline, is a known robot that is offline or has no
+      position yet -- say that; never call it unknown or "not in the fleet". A platform word
+      ("the spots", "the huskies") means the roster's online robots of that platform. If the
+      user names a robot
+      that is not in it (a typo such as "hamiltonm"), ask which robot they mean and list the
+      known ones; never guess, and never invent a robot name. The base station or planner
+      host (e.g. willow) is not a robot: never put it in a goal.
+examples:
+  - user: Visit all the cones (cones O1, O4, O9)
+    goal: (and (visited-object o1) (visited-object o4) (visited-object o9))
+    note: no robot named, so no -by form and no use-robots; the planner allocates
+  - user: Visit all the chairs with both euclid and hamilton (chairs O2, O8, O11)
+    goal: (and (visited-object o2) (visited-object o8) (visited-object o11))
+    note: plus the constraint (use-robots euclid hamilton); NOT two goals, one per robot, and NOT visited-object-by for every chair
+  - user: Split the 4 cones among both
+    goal: the same kind of ONE robot-free goal over those 4 cones
+    note: plus (use-robots euclid hamilton); the planner does the split, never divide them yourself
+  - user: Hamilton and euclid, go to O3
+    goal: (and (visited-object-by hamilton o3) (visited-object-by euclid o3))
+    note: both must go, so one -by atom per robot and no use-robots; (visited-object o3) is done once one robot gets there
+  - user: All robots visit all the trash cans (trash cans O4, O8, O15)
+    goal: (and (visited-object o4) (visited-object o8) (visited-object o15))
+    note: all robots is the whole team, so no use-robots (and never a husky in use-robots unless the user names it)
+  - user: Send hamilton to a trash can and euclid to a different one (trash cans O4, O8, O15)
+    goal: (and (visited-object-by hamilton o4) (visited-object-by euclid o8))
+    note: you choose, nearest first, and say which; never an or over the pairs
+  - user: Only euclid should visit O2
+    goal: (visited-object o2)
+    note: plus the constraint (use-robots euclid)
+  - user: Hamilton, go to O21. Gauss, inspect O26
+    goal: (and (visited-object-by hamilton o21) (inspected-by gauss o26))
+  - user: Also have hamilton visit O30
+    goal: (and (visited-object-by hamilton o21) (inspected-by gauss o26) (visited-object-by hamilton o30))
+    note: right after the goal above; its tasks are re-sent with their robots
+  - engines: [fast_downward]
+    user: Euclid, be at O20
+    goal: (at-object euclid o20)
+    note: euclid ends there; "go to O20" would be visited-object-by
+  - engines: [fast_downward]
+    user: Hamilton, wait at t7
+    goal: (at-place hamilton t7)
+  - engines: [fast_downward]
+    user: Euclid visits O8 then stays at t12
+    goal: (and (visited-object-by euclid o8) (at-place euclid t12))
+  - user: Move O120 to place t11
+    goal: (object-in-place o120 t11)
+  - user: Have euclid move O58 to t1253
+    goal: (object-placed-by euclid o58 t1253)
+  - engines: [grstaps]
+    user: Search the loading dock (region R3)
+    goal: (explored-region r3)
+  - engines: [grstaps]
+    user: Hamilton, search R3
+    goal: (explored-region-by hamilton r3)
+  - engines: [grstaps]
+    user: Hamilton, pick up O1
+    goal: (holding hamilton o1)
+    note: hamilton ends the plan holding o1 and does nothing else in it
+  - engines: [grstaps]
+    user: Hamilton picks up O1, euclid picks up O20
+    goal: (and (holding hamilton o1) (holding euclid o20))
+  - engines: [grstaps]
+    user: Each of hamilton and euclid pick up a different cone (cones O1, O20)
+    goal: (and (holding hamilton o1) (holding euclid o20))
+    note: no or in GRSTAPS-X, so name a specific robot for each cone, nearest first

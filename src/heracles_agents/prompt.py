@@ -308,6 +308,19 @@ class Prompt(BaseModel):
         return repr(self.to_openai_json("<Question>"))
 
 
+def with_package_prompt(prompt_yaml: dict) -> dict:
+    """A prompt with ``repair_chat_prompt: <engine>`` takes the plan-repair chat's
+    prompt from the installed package (heracles_agents.prompts); its other fields
+    (labelspace, templates) are added to that prompt or override it."""
+    engine = prompt_yaml.get("repair_chat_prompt")
+    if engine is None:
+        return prompt_yaml
+    from heracles_agents.prompts import repair_chat_prompt
+
+    rest = {k: v for k, v in prompt_yaml.items() if k != "repair_chat_prompt"}
+    return {**repair_chat_prompt(engine), **rest}
+
+
 class PromptSettings(BaseModel):
     base_prompt: Prompt
     output_type: Optional[str] = None
@@ -328,9 +341,9 @@ class PromptSettings(BaseModel):
                     raise ValueError(f"Prompt path does not exist: {prompt_path}")
                 with open(prompt_path, "r") as fo:
                     prompt_yaml = yaml.safe_load(fo)
-                return Prompt(**prompt_yaml)
+                return Prompt(**with_package_prompt(prompt_yaml))
             case dict():
-                return prompt_path
+                return with_package_prompt(prompt_path)
             case Prompt():
                 return prompt_path
             case _:

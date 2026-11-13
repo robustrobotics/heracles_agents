@@ -31,10 +31,18 @@ in_context_examples:
   - user: |
       Instruction: Put the cone next to object 7.
     assistant: "I need the cone's id, the place it is in now, and the MeshPlace closest to o7. Let me query them.\n\nUsing run_cypher_query to find the cone and the places nearest O7; I'll send (object-in-place <cone> <the closest place>). If the closest place is the one the cone is already in, the cone is already next to o7: I'll say so and send nothing."
-  # Pick up and keep: holding
+  # Pick up and keep: holding, by the robot the user names
   - user: |
-      Instruction: Pick up object 120 and bring it to me at place 11.
-    assistant: "I'll have robot hilbert pick up o120 and end at place t11 still holding it.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (holding hilbert o120)(at-place hilbert t11))"
+      Instruction: Hilbert, pick up object 120 and bring it to me at place 11.
+    assistant: "Hilbert is named, so hilbert picks up o120 and ends at place t11 still holding it.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (holding hilbert o120)(at-place hilbert t11))"
+  # No robot named: one robot-free goal for every target; the planner allocates
+  - user: |
+      Instruction: Visit objects 1, 4 and 9.
+    assistant: "No robot is named, so the planner allocates them: one goal for all three, with no robot in it.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-object o1)(visited-object o4)(visited-object o9))"
+  # Robots limited without per-task assignment: robot-free goal plus use-robots
+  - user: |
+      Instruction: Visit objects 1, 4 and 9 with both hamilton and euclid.
+    assistant: "Both robots may share the work, so the goal stays robot-free and use-robots limits the team to them; the planner splits the visits.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-object o1)(visited-object o4)(visited-object o9)) and constraints_json=[[\"use-robots\", \"hamilton\", \"euclid\"]]"
   # Tasks assigned to named robots: "-by" predicates, all in one goal
   - user: |
       Instruction: Hamilton, go to object 21. Gauss, go to place 629 and inspect object 26.

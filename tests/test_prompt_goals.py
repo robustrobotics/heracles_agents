@@ -5,7 +5,9 @@ import re
 
 import yaml
 
-COMMON = os.path.join(os.path.dirname(__file__), "..", "examples", "prompts", "common")
+COMMON = os.path.join(
+    os.path.dirname(__file__), "..", "src", "heracles_agents", "prompts"
+)
 EXAMPLES = [
     "pddl_in_context_examples_with_constraints.yaml",
     "pddl_in_context_examples_grstaps.yaml",

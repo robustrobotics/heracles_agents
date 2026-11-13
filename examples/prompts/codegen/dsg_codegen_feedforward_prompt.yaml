@@ -5,7 +5,7 @@ system: |
   Unless otherwise specified, you should return the node symbols of things you are asked about.
   Do not return more information than is explicitly requested.
 
-scene_graph_description: ${HERACLES_AGENTS_PATH}/examples/prompts/common/scene_graph_description.yaml
+scene_graph_description: ${HERACLES_AGENTS_PATH}/src/heracles_agents/prompts/scene_graph_description.yaml
 
 labelspace_description: ${HERACLES_AGENTS_PATH}/examples/prompts/common/building_45_labelspace.yaml
 

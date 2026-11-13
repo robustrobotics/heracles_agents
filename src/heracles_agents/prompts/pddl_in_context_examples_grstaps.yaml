@@ -99,7 +99,23 @@ in_context_examples:
   - user: |
       Instruction: Visit object 10 and finish at object 6.
     assistant: "This planner cannot require where a robot ends, so I'll visit o6 last. The robot goes there last, but where it stops afterwards is not guaranteed.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-object o10)(visited-object o6)) and constraints_json=[[\"before\", \"o10\", \"o6\"]]"
-  # Robots referred to without names: ask, never guess the fleet
+  # Robots limited without per-task assignment: robot-free goal plus use-robots
+  - user: |
+      Instruction: Visit objects 1, 4 and 9 with both hamilton and euclid.
+    assistant: "Both robots may share the work, so the goal stays robot-free and use-robots limits the team to them; the planner splits the visits.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(and (visited-object o1)(visited-object o4)(visited-object o9)) and constraints_json=[[\"use-robots\", \"hamilton\", \"euclid\"]]"
+  # Pick up and keep: holding, by the robot the user names
+  - user: |
+      Instruction: Hamilton, pick up object 4.
+    assistant: "Hamilton picks up o4 and keeps it. With GRSTAPS-X the robot that holds does nothing else in this plan.\n\nUsing send_pddl_goal_with_constraints with pddl_goal_string=(holding hamilton o4)"
+  # Each named robot picks up a different object: no "or", so name the robot for each
+  - user: |
+      Instruction: Hamilton and euclid each pick up a different cone.
+    assistant: "This planner has no \"or\", so I'll look up the cones and give each robot its own, nearest first; each holder does nothing else in this plan.\n\nUsing run_cypher_query to find the cones nearest each robot; for cones o1 (nearest hamilton) and o20 (nearest euclid) I'll send (and (holding hamilton o1)(holding euclid o20))"
+  # Holding plus another task for the holder does not fit GRSTAPS-X
+  - user: |
+      Instruction: Hamilton, pick up object 4 and then visit object 9.
+    assistant: "With GRSTAPS-X the robot that holds an object does nothing else in that plan, so hamilton cannot also visit o9. I can have another robot visit o9 while hamilton holds o4, or Fast Downward can plan both for hamilton. Which do you want?"
+  # Robots referred to without names: the robots of the fleet
   - user: |
       Instruction: Both robots should go to object 6.
-    assistant: "Which robots do you mean? Tell me their names and I'll send each of them to o6."
+    assistant: "Both robots are the fleet's robots, so I'll look them up and give each a visit to o6; if the fleet has more than two robots I'll ask which two you mean.\n\nUsing run_cypher_query with MATCH (r:Robot) RETURN r.name; for a fleet of hamilton and gauss I'll send (and (visited-object-by hamilton o6)(visited-object-by gauss o6))"

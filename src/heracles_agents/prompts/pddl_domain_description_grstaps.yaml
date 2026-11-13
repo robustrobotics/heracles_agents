@@ -3,7 +3,7 @@ domain_description: |
       The PDDL domain consists of the following predicates. These predicates get parameterized by symbols from a 3D scene graph.
       IMPORTANT: every ID you use must be a nodeSymbol you actually read from the database, written in LOWERCASE. Never invent an ID, and never change its prefix letter: if a query returns "T4826" you send "t4826", not "p4826". Look IDs up with run_cypher_query rather than guessing them from the examples below.
 
-      CRITICAL -- predicate arity differs. The plain "visited-" and "safe" predicates take ONLY the target. The "-by" predicates take the ROBOT NAME FIRST, then the target. Using the wrong number of arguments makes the planner reject the problem outright, so copy these shapes exactly:
+      CRITICAL -- predicate arity differs. The plain "visited-" and "safe" predicates take ONLY the target. The "-by" predicates and "holding" take the ROBOT NAME FIRST, then the target. Using the wrong number of arguments makes the planner reject the problem outright, so copy these shapes exactly:
 
       (visited-place ?t): Some robot visited place ?t at some point, where '?t' is a placeholder for a MeshPlace ID.
       (visited-object ?o): Some robot visited object ?o at some point, where '?o' is a placeholder for an Object ID.
@@ -21,6 +21,13 @@ domain_description: |
       For a region: (explored-region-by hamilton r3) is correct; (explored-region-by r3) is REJECTED.
       To assign tasks to several robots, put them all in ONE goal: (and (visited-object-by hamilton o16)(visited-object-by gauss o7)). Sending two goals does not add them up: the second replaces the first.
       "Hamilton and gauss both go to X" is one -by predicate per robot: (and (visited-object-by hamilton o6)(visited-object-by gauss o6)).
+      (holding ?r ?o): Robot ?r picks object ?o up and still holds it when the plan ends. Robot name FIRST: (holding hamilton o4); (holding o4) is REJECTED.
+      GRSTAPS-X limits on holding (explain the one that applies to the user up front, before proposing):
+        - The robot that holds does nothing else in that plan: it gets no other task, and the goal must not name it in a -by predicate too.
+        - One holding goal per robot (a robot holds one object at a time), and one robot per object.
+        - An object cannot be both held and placed: never holding together with object-in-place / object-placed-by for the same object.
+        - Only a robot with an arm can hold: never a husky, and never a robot without a manipulator.
+      "Each of hamilton and euclid pick up a different cone" names a specific robot for each cone (this planner has no "or"): (and (holding hamilton o1)(holding euclid o20)).
 
       You can compose goals using:
       and: multiple predicates must be true. Example: (and (visited-place ?t)(visited-object ?o))
@@ -28,7 +35,6 @@ domain_description: |
       This planner does NOT support these, and rejects any goal that uses them:
       - "or". If the user is not specific about which object or place ("go to a door"), query the candidates and pick ONE of them yourself; say which one you picked.
       - at-place / at-object (where a robot must END). Visit the final stop with a visited- predicate and order it last with a before constraint; tell the user the robot will go there last but where it stops afterwards is not guaranteed.
-      - holding (pick something up and keep it). Tell the user this planner can only move an object to a place, and offer object-in-place instead.
       - "not", except (not (suspicious ?o)) described below.
 
       To find the correct place or object IDs, use the run_cypher_query tool to query the scene graph database.
@@ -47,6 +53,8 @@ domain_description: |
       - forbidden-edge: forbids the robot from traversing the edge between two points.
         Example: [["forbidden-edge", "?t1", "?t2"]] blocks the corridor between places ?t1 and ?t2.
         NOTE: forbidden-edge is unordered. You only need ONE direction, not both.
+      - use-robots: only the robots it names act in this goal; the others get no actions (an empty plan).
+        Example: [["use-robots", "hamilton", "euclid"]]. The team goal rules say when to use it.
       - before: orders the work. [["before", "?a", "?b"]] means everything the plan does at ?a
         finishes before anything it does at ?b starts. ?a and ?b are ordinary place or object IDs,
         the same ones used in the goal.
