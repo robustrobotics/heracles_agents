@@ -1,9 +1,9 @@
 # Who does what in a PDDL goal sent to the plan-repair goal manager.
 #
-# Every chat that sends such goals follows these rules: examples/chatdsg_repair,
-# examples/chatdsg_repair_grstaps and the ADT4 web console (adt4_console), all
-# through heracles_agents.prompts. A rule without `engines` applies to both
-# engines: fast_downward (multi-robot Fast Downward) and grstaps (GRSTAPS-X).
+# Every chat that sends such goals follows these rules: examples/chatdsg_repair
+# and the ADT4 web console (adt4_console), both through heracles_agents.prompts.
+# A rule with `engines` applies to those engines only; the one engine is
+# fast_downward (multi-robot Fast Downward).
 # Goals are written the way the planner takes them: lowercase ids, robot first.
 title: "TEAM GOALS (who does what):"
 rules:
@@ -20,25 +20,12 @@ rules:
       object) or holding / at-place / at-object. Robot name FIRST, then the target:
       (visited-object-by hamilton o21). A goal without the robot's name lets the planner give
       the task to any robot, and it will ignore the user's assignment.
-  - engines: [grstaps]
-    text: >-
-      If the user says which robot does a task, the goal MUST name that robot: the -by forms
-      (visited-object-by, visited-place-by, inspected-by, visited-region-by,
-      explored-region-by, and object-placed-by to move an object) or holding. Robot name FIRST,
-      then the target: (visited-object-by hamilton o21). A goal without the robot's name lets the
-      planner give the task to any robot, and it will ignore the user's assignment.
   - engines: [fast_downward]
     text: >-
       If the user names no robot for a task, use the robot-free forms -- (visited-object o),
       (visited-place t), and (object-in-place o t) to move an object -- and let the planner
       allocate it. To look at or inspect an object with no robot named, use
       (visited-object o): inspected-by needs a robot.
-  - engines: [grstaps]
-    text: >-
-      If the user names no robot for a task, use the robot-free forms -- (visited-object o),
-      (visited-place t), (object-in-place o t) to move an object, (visited-region r),
-      (explored-region r), and (not (suspicious o)) to inspect -- and let the planner
-      allocate it.
   - text: >-
       Never pick a robot yourself for work the user did not assign: not the nearest robot, not
       the selected robot, not the robot talked about last. Never split the targets between
@@ -83,26 +70,12 @@ rules:
       (and (visited-object-by hamilton o4) (visited-object-by euclid o8)). Do not list the
       alternatives in an or: the only or is the two-robots-two-objects case of the holding
       rule below.
-  - engines: [grstaps]
-    text: >-
-      When the user leaves the target open ("a trash can", "a different cone each", "any
-      chair"), you choose: one specific target for each named robot, the nearest first (the
-      distance query above), different targets when the user says different, and tell the user
-      which you chose. "Send hamilton to a trash can and euclid to a different one" is
-      (and (visited-object-by hamilton o4) (visited-object-by euclid o8)).
   - text: >-
       Constraints are written in these rules in short form, (use-robots euclid hamilton). The
       tool takes them in its own form, and it is the same constraint: as a JSON list,
       ["use-robots", "euclid", "hamilton"], or, in the ADT4 console, as an object
       {predicate, symbols}: {predicate: 'use-robots', symbols: ['euclid', 'hamilton']}. Never
       put a constraint inside the PDDL goal.
-  - engines: [grstaps]
-    text: >-
-      GRSTAPS-X refuses a use-robots goal that does not fit it. A robot named in a -by form or
-      in holding must also be in use-robots: a -by or holding robot left out of use-robots is
-      an error. And use-robots must name at least one robot that can take part: a list where
-      every robot has no pose, is busy, or is a husky (GRSTAPS-X plans no husky) is an error.
-      Check both before proposing.
   - text: >-
       Moving an object: when the user names the robot that should move it, use
       (object-placed-by <robot> <object> <place>); otherwise use (object-in-place <object>
@@ -125,23 +98,6 @@ rules:
       or cones give each named robot a different cone, nearest first, in one goal,
       (and (holding hamilton o1) (holding euclid o20)). If the user only says "pick up X"
       with no robot and no destination, ask which robot should hold it.
-  - engines: [grstaps]
-    text: >-
-      Picking up and keeping an object (holding <robot> <object>) needs a robot: the domain has
-      no robot-free holding. When the user wants the object taken somewhere, use
-      (object-placed-by <robot> o t) or (object-in-place o t), not holding. GRSTAPS-X has no or, so you decide who takes what: "each of hamilton
-      and euclid pick up a different cone" is ONE goal that names a specific robot for each
-      cone, nearest first, (and (holding hamilton o1) (holding euclid o20)). If the user only
-      says "pick up X" with no robot and no destination, ask which robot should hold it.
-      GRSTAPS-X's holding limits -- explain the one that applies up front, before proposing:
-      the robot that holds does nothing else in that plan (no other task and no -by goal for
-      it; give the other tasks to other robots); one holding goal per robot, and one robot per
-      object; an object cannot be both held and placed (no holding together with
-      object-in-place / object-placed-by for the same object); only a robot with an arm can
-      hold: never a husky, and never a robot without a manipulator. A request that needs
-      more (one robot holding two objects, holding plus other tasks for the holder) does not
-      fit GRSTAPS-X: say so and offer object-in-place, another robot, or Fast Downward (the
-      console's planner toggle).
   - engines: [fast_downward]
     text: >-
       Ending or staying somewhere: when the user wants a named robot to END or STAY at a place
@@ -151,15 +107,6 @@ rules:
       stay visited-*-by / visited-* as above. If the user explicitly asks for the at predicate,
       use it. at-place / at-object always need a robot: if the user names none, ask which robot
       should end there (as for holding).
-  - engines: [grstaps]
-    text: >-
-      Ending or staying somewhere ("be at", "stay at", "end at", "wait at", "park at", "stop
-      at", "block", "stand by", "go to X and stay", or the at predicate by name): GRSTAPS-X
-      cannot hold a robot at a final position (it takes no at-place / at-object); Fast Downward
-      can (the console's planner toggle). Tell the user so, and offer the substitute: visit it
-      last with a visited- predicate and a before constraint, so the robot goes there last but
-      where it stops afterwards is not guaranteed. Never say that "the system" or "the
-      interface" does not support at-place / at-object: only GRSTAPS-X does not.
   - text: >-
       A new goal replaces the old one. When the user adds a task, re-send the tasks of the
       last goal that are still wanted together with the new one, each as it was (with its
@@ -217,20 +164,3 @@ examples:
     goal: (object-in-place o120 t11)
   - user: Have euclid move O58 to t1253
     goal: (object-placed-by euclid o58 t1253)
-  - engines: [grstaps]
-    user: Search the loading dock (region R3)
-    goal: (explored-region r3)
-  - engines: [grstaps]
-    user: Hamilton, search R3
-    goal: (explored-region-by hamilton r3)
-  - engines: [grstaps]
-    user: Hamilton, pick up O1
-    goal: (holding hamilton o1)
-    note: hamilton ends the plan holding o1 and does nothing else in it
-  - engines: [grstaps]
-    user: Hamilton picks up O1, euclid picks up O20
-    goal: (and (holding hamilton o1) (holding euclid o20))
-  - engines: [grstaps]
-    user: Each of hamilton and euclid pick up a different cone (cones O1, O20)
-    goal: (and (holding hamilton o1) (holding euclid o20))
-    note: no or in GRSTAPS-X, so name a specific robot for each cone, nearest first

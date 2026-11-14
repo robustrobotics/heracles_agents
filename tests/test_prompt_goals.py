@@ -10,7 +10,6 @@ COMMON = os.path.join(
 )
 EXAMPLES = [
     "pddl_in_context_examples_with_constraints.yaml",
-    "pddl_in_context_examples_grstaps.yaml",
 ]
 _GOAL = re.compile(r"pddl_goal_string=(\(.*?\))(?: and constraints_json|$)")
 

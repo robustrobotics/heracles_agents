@@ -1,5 +1,5 @@
-# The plan-repair chat's own instructions (examples/chatdsg_repair and
-# examples/chatdsg_repair_grstaps): its tools, the goal confirmation, scene change
+# The plan-repair chat's own instructions (examples/chatdsg_repair):
+# its tools, the goal confirmation, scene change
 # reports and scene graph edits. heracles_agents.prompts.repair_chat_prompt puts
 # the team goal rules (team_goal_rules.yaml) where <<TEAM_GOAL_RULES>> is, and
 # the engine's lines from `engine_lines` for the other <<...>> markers.
@@ -63,9 +63,3 @@ engine_lines:
     USE_ROBOTS_FORMAT: |
       - use-robots goes in constraints_json as ["use-robots", "<name>", ...]: only the robots it names act in this goal, and the others get no actions.
     ROOMS: "- This graph has no Room nodes, so do not query for Rooms or try to group nodes by room."
-  grstaps:
-    REGION_IDS: |
-      - Use only region symbols the scene graph has: MATCH (g:Room) RETURN g.nodeSymbol, g.class. Never write a region id you did not read there (r3, r(0) ...); if the map has no Room nodes, say it has no regions.
-    USE_ROBOTS_FORMAT: |
-      - use-robots goes in constraints_json as ["use-robots", "<name>", ...]: only the robots it names act in this goal, and the others get no actions.
-    ROOMS: "- Rooms (regions) are labeled \"Room\" with properties: nodeSymbol ('R3', lowercase it to r3 in goals), class, center. Some maps have none; then do not group nodes by room."

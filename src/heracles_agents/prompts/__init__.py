@@ -1,9 +1,8 @@
 """The plan-repair chat's planning knowledge, installed with the package.
 
 One source for every chat that sends PDDL goals to the plan-repair goal
-manager: examples/chatdsg_repair, examples/chatdsg_repair_grstaps, and the ADT4
-web console (adt4_console), which imports this module instead of keeping its
-own copy.
+manager: examples/chatdsg_repair and the ADT4 web console (adt4_console),
+which imports this module instead of keeping its own copy.
 
     team_goal_rules(engine)        who does what: -by forms only for robots the
                                    user names, robot-free forms otherwise
@@ -14,8 +13,8 @@ own copy.
     cypher_interface_description() the Neo4j labels and relationships
     repair_chat_prompt(engine)     the full Prompt fields of chatdsg_repair
 
-``engine`` is "fast_downward" (multi-robot Fast Downward) or "grstaps"
-(GRSTAPS-X). The texts are the YAML files next to this module; nothing here
+``engine`` is "fast_downward" (multi-robot Fast Downward), the one engine in
+ENGINES. The texts are the YAML files next to this module; nothing here
 needs ROS or a database.
 """
 
@@ -26,15 +25,13 @@ from importlib import resources
 
 import yaml
 
-ENGINES = ("fast_downward", "grstaps")
+ENGINES = ("fast_downward",)
 
 _DOMAIN = {
     "fast_downward": "pddl_domain_description_with_constraints.yaml",
-    "grstaps": "pddl_domain_description_grstaps.yaml",
 }
 _EXAMPLES = {
     "fast_downward": "pddl_in_context_examples_with_constraints.yaml",
-    "grstaps": "pddl_in_context_examples_grstaps.yaml",
 }
 _SCENE_GRAPH = {
     # traversability places, no semantic class (the repair chats' maps)
@@ -44,9 +41,16 @@ _SCENE_GRAPH = {
 }
 
 
+class UnsupportedEngineError(ValueError):
+    """The caller asked for the goal rules of a planner engine not in ENGINES."""
+
+
 def _engine(engine: str) -> str:
     if engine not in ENGINES:
-        raise ValueError(f"unknown planner engine {engine!r}: use one of {ENGINES}")
+        raise UnsupportedEngineError(
+            f"heracles_agents has no PDDL goal rules for the planner engine "
+            f"{engine!r}: use one of {ENGINES}"
+        )
     return engine
 
 
